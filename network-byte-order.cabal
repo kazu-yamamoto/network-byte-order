@@ -3,8 +3,8 @@
 
 name:                network-byte-order
 version:             0.0.0.0
--- synopsis:
--- description:
+synopsis:            Network byte order utilities
+description:         Peek and poke functions for network byte order.
 license:             BSD3
 license-file:        LICENSE
 author:              Kazu Yamamoto

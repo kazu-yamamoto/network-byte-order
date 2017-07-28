@@ -1,3 +1,5 @@
+-- | Peek and poke functions for network byte order.
+
 module Network.ByteOrder (
     -- *Types
     Buffer
