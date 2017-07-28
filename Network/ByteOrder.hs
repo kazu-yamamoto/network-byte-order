@@ -14,11 +14,16 @@ module Network.ByteOrder (
   , peek24
   , peek32
   , peek64
-    -- *Creating ByteString
-  , bytestring1
-  , bytestring2
-  , bytestring4
+    -- *From Word to ByteString
   , bytestring8
+  , bytestring16
+  , bytestring32
+  , bytestring64
+    -- *From ByteString to Word
+  , word8
+  , word16
+  , word32
+  , word64
     -- *Utilities
   , unsafeWithByteString
   ) where
@@ -26,12 +31,15 @@ module Network.ByteOrder (
 import Data.Bits (shiftR, shiftL, (.&.), (.|.))
 import Data.ByteString.Internal (ByteString(..), unsafeCreate)
 import Data.Word (Word8, Word16, Word32, Word64)
+import Foreign.ForeignPtr (withForeignPtr)
 import Foreign.Ptr (Ptr, plusPtr)
 import Foreign.Storable (poke, peek)
-import Foreign.ForeignPtr (withForeignPtr)
+import System.IO.Unsafe (unsafeDupablePerformIO)
 
 -- $setup
--- >>> import Data.ByteString
+-- >>> import Data.ByteString hiding (foldl')
+-- >>> import Data.Word
+-- >>> import Data.List
 
 ----------------------------------------------------------------
 
@@ -193,17 +201,71 @@ peek64 ptr off = do
 
 ----------------------------------------------------------------
 
-bytestring1 :: Word8 -> ByteString
-bytestring1 w = unsafeCreate 1 $ \ptr -> poke8 w ptr 0
+-- |
+--
+-- >>> let w = 5 :: Word8
+-- >>> unpack $ bytestring8 w
+-- [5]
+bytestring8 :: Word8 -> ByteString
+bytestring8 w = unsafeCreate 1 $ \ptr -> poke8 w ptr 0
 
-bytestring2 :: Word16 -> ByteString
-bytestring2 w = unsafeCreate 2 $ \ptr -> poke16 w ptr 0
+-- |
+--
+-- >>> let w = foldl' (\x y -> x * 256 + y) 0 [5,6] :: Word16
+-- >>> unpack $ bytestring16 w
+-- [5,6]
+bytestring16 :: Word16 -> ByteString
+bytestring16 w = unsafeCreate 2 $ \ptr -> poke16 w ptr 0
 
-bytestring4 :: Word32 -> ByteString
-bytestring4 w = unsafeCreate 4 $ \ptr -> poke32 w ptr 0
+-- |
+--
+-- >>> let w = foldl' (\x y -> x * 256 + y) 0 [5,6,7,8] :: Word32
+-- >>> unpack $ bytestring32 w
+-- [5,6,7,8]
+bytestring32 :: Word32 -> ByteString
+bytestring32 w = unsafeCreate 4 $ \ptr -> poke32 w ptr 0
 
-bytestring8 :: Word64 -> ByteString
-bytestring8 w = unsafeCreate 8 $ \ptr -> poke64 w ptr 0
+-- |
+--
+-- >>> let w = foldl' (\x y -> x * 256 + y) 0 [1,2,3,4,5,6,7,8] :: Word64
+-- >>> unpack $ bytestring64 w
+-- [1,2,3,4,5,6,7,8]
+bytestring64 :: Word64 -> ByteString
+bytestring64 w = unsafeCreate 8 $ \ptr -> poke64 w ptr 0
+
+----------------------------------------------------------------
+
+-- |
+--
+-- >>> let buf = pack [1,2,3,4,5,6,7,8]
+-- >>> word8 buf
+-- 1
+word8 :: ByteString -> Word8
+word8 bs = unsafeDupablePerformIO $ unsafeWithByteString bs peek8
+
+-- |
+--
+-- >>> let buf = pack [1,2,3,4,5,6,7,8]
+-- >>> word16 buf
+-- 258
+word16 :: ByteString -> Word16
+word16 bs = unsafeDupablePerformIO $ unsafeWithByteString bs peek16
+
+-- |
+--
+-- >>> let buf = pack [1,2,3,4,5,6,7,8]
+-- >>> word32 buf
+-- 16909060
+word32 :: ByteString -> Word32
+word32 bs = unsafeDupablePerformIO $ unsafeWithByteString bs peek32
+
+-- |
+--
+-- >>> let buf = pack [1,2,3,4,5,6,7,8]
+-- >>> word64 buf
+-- 72623859790382856
+word64 :: ByteString -> Word64
+word64 bs = unsafeDupablePerformIO $ unsafeWithByteString bs peek64
 
 ----------------------------------------------------------------
 
