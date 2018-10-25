@@ -12,7 +12,7 @@ maintainer:          kazu@iij.ad.jp
 -- copyright:
 category:            Network
 build-type:          Simple
-extra-source-files:  ChangeLog.md
+-- extra-source-files:  ChangeLog.md
 cabal-version:       >= 1.10
 
 library
