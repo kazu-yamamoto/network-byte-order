@@ -35,8 +35,8 @@ module Network.ByteOrder (
     -- *Utilities
   , unsafeWithByteString
     -- *Writing to buffer
-  , WorkingBuffer(..)
-  , newWorkingBuffer
+  , WriteBuffer(..)
+  , newWriteBuffer
   , wind
   , readWord8
   , writeWord8
@@ -313,33 +313,31 @@ unsafeWithByteString :: ByteString -> (Buffer -> Offset -> IO a) -> IO a
 unsafeWithByteString (PS fptr off _) io = withForeignPtr fptr $
     \ptr -> io ptr off
 
-
-
 ----------------------------------------------------------------
 
-data WorkingBuffer = WorkingBuffer {
+data WriteBuffer = WriteBuffer {
     start :: !Buffer
   , limit :: !Buffer
   , offset :: !(IORef Buffer)
   }
 
-newWorkingBuffer :: Buffer -> BufferSize -> IO WorkingBuffer
-newWorkingBuffer buf siz = WorkingBuffer buf (buf `plusPtr` siz) <$> newIORef buf
+newWriteBuffer :: Buffer -> BufferSize -> IO WriteBuffer
+newWriteBuffer buf siz = WriteBuffer buf (buf `plusPtr` siz) <$> newIORef buf
 
 {-# INLINE wind #-}
-wind :: WorkingBuffer -> Int -> IO ()
-wind WorkingBuffer{..} n = do
+wind :: WriteBuffer -> Int -> IO ()
+wind WriteBuffer{..} n = do
     ptr <- readIORef offset
     let !ptr' = ptr `plusPtr` n
     writeIORef offset ptr'
 
 {-# INLINE readWord8 #-}
-readWord8 :: WorkingBuffer -> IO Word8
-readWord8 WorkingBuffer{..} = readIORef offset >>= peek
+readWord8 :: WriteBuffer -> IO Word8
+readWord8 WriteBuffer{..} = readIORef offset >>= peek
 
 {-# INLINE writeWord8 #-}
-writeWord8 :: WorkingBuffer -> Word8 -> IO ()
-writeWord8 WorkingBuffer{..} w = do
+writeWord8 :: WriteBuffer -> Word8 -> IO ()
+writeWord8 WriteBuffer{..} w = do
     ptr <- readIORef offset
     if ptr >= limit then
         throwIO BufferOverrun
@@ -349,9 +347,9 @@ writeWord8 WorkingBuffer{..} w = do
         writeIORef offset ptr'
 
 {-# INLINE shiftLastN #-}
-shiftLastN :: WorkingBuffer -> Int -> Int -> IO ()
-shiftLastN WorkingBuffer{..} 0 _   = return ()
-shiftLastN WorkingBuffer{..} i len = do
+shiftLastN :: WriteBuffer -> Int -> Int -> IO ()
+shiftLastN WriteBuffer{..} 0 _   = return ()
+shiftLastN WriteBuffer{..} i len = do
     ptr <- readIORef offset
     let !ptr' = ptr `plusPtr` i
     if ptr' >= limit then
@@ -380,8 +378,8 @@ shiftLastN WorkingBuffer{..} i len = do
         shiftRight (dst `plusPtr` (-1)) (src `plusPtr` (-1)) (n - 1)
 
 {-# INLINE copyByteString #-}
-copyByteString :: WorkingBuffer -> ByteString -> IO ()
-copyByteString WorkingBuffer{..} (PS fptr off len) = withForeignPtr fptr $ \ptr -> do
+copyByteString :: WriteBuffer -> ByteString -> IO ()
+copyByteString WriteBuffer{..} (PS fptr off len) = withForeignPtr fptr $ \ptr -> do
     let src = ptr `plusPtr` off
     dst <- readIORef offset
     let !dst' = dst `plusPtr` len
@@ -391,85 +389,81 @@ copyByteString WorkingBuffer{..} (PS fptr off len) = withForeignPtr fptr $ \ptr 
         memcpy dst src len
         writeIORef offset dst'
 
-toByteString :: WorkingBuffer -> IO ByteString
-toByteString WorkingBuffer{..} = do
+toByteString :: WriteBuffer -> IO ByteString
+toByteString WriteBuffer{..} = do
     ptr <- readIORef offset
     let !len = ptr `minusPtr` start
     create len $ \p -> memcpy p start len
 
 {-# INLINE returnLength #-}
-returnLength :: WorkingBuffer -> IO () -> IO Int
-returnLength WorkingBuffer{..} body = do
+returnLength :: WriteBuffer -> IO () -> IO Int
+returnLength WriteBuffer{..} body = do
     beg <- readIORef offset
     body
     end <- readIORef offset
     return $ end `minusPtr` beg
 
-withTemporaryBuffer :: Int -> (WorkingBuffer -> IO ()) -> IO ByteString
+withTemporaryBuffer :: Int -> (WriteBuffer -> IO ()) -> IO ByteString
 withTemporaryBuffer siz action = bracket (mallocBytes siz) free $ \buf -> do
-    wbuf <- newWorkingBuffer buf 4096
+    wbuf <- newWriteBuffer buf 4096
     action wbuf
     toByteString wbuf
 
-currentOffset :: WorkingBuffer -> IO Buffer
-currentOffset WorkingBuffer{..} = readIORef offset
+currentOffset :: WriteBuffer -> IO Buffer
+currentOffset WriteBuffer{..} = readIORef offset
 
 ----------------------------------------------------------------
 
-data ReadBuffer = ReadBuffer {
-    beg :: !Buffer
-  , end :: !Buffer
-  , cur :: !(IORef Buffer)
-  }
+newtype ReadBuffer = ReadBuffer WriteBuffer
 
 withReadBuffer :: ByteString -> (ReadBuffer -> IO a) -> IO a
 withReadBuffer (PS fp off len) action = withForeignPtr fp $ \ptr -> do
     let !bg = ptr `plusPtr` off
         !ed = bg `plusPtr` len
-    nsrc <- ReadBuffer bg ed <$> newIORef bg
+    nsrc <- ReadBuffer . WriteBuffer bg ed <$> newIORef bg
     action nsrc
 
 {-# INLINE hasOneByte #-}
 hasOneByte :: ReadBuffer -> IO Bool
-hasOneByte ReadBuffer{..} = do
-    ptr <- readIORef cur
-    return $! ptr < end
+hasOneByte (ReadBuffer WriteBuffer{..}) = do
+    ptr <- readIORef offset
+    return $! ptr < limit
 
 {-# INLINE hasMoreBytes #-}
 hasMoreBytes :: ReadBuffer -> Int -> IO Bool
-hasMoreBytes ReadBuffer{..} n = do
-    ptr <- readIORef cur
-    return $! (end `minusPtr` ptr) >= n
+hasMoreBytes (ReadBuffer WriteBuffer{..}) n = do
+    ptr <- readIORef offset
+    return $! (limit `minusPtr` ptr) >= n
 
 {-# INLINE rewindOneByte #-}
 rewindOneByte :: ReadBuffer -> IO ()
-rewindOneByte ReadBuffer{..} = modifyIORef' cur (`plusPtr` (-1))
+rewindOneByte (ReadBuffer WriteBuffer{..}) = modifyIORef' offset (`plusPtr` (-1))
 
 {-# INLINE getByte #-}
 getByte :: ReadBuffer -> IO Word8
-getByte ReadBuffer{..} = do
-    ptr <- readIORef cur
+getByte (ReadBuffer WriteBuffer{..}) = do
+    ptr <- readIORef offset
     w <- peek ptr
-    writeIORef cur $! ptr `plusPtr` 1
+    writeIORef offset $! ptr `plusPtr` 1
     return w
 
 {-# INLINE getByte' #-}
 getByte' :: ReadBuffer -> IO Int
-getByte' ReadBuffer{..} = do
-    ptr <- readIORef cur
-    if ptr < end then do
+getByte' (ReadBuffer WriteBuffer{..}) = do
+    ptr <- readIORef offset
+    if ptr < limit then do
         w <- peek ptr
-        writeIORef cur $! ptr `plusPtr` 1
+        writeIORef offset $! ptr `plusPtr` 1
         let !i = fromIntegral w
         return i
       else
         return (-1)
 
 extractByteString :: ReadBuffer -> Int -> IO ByteString
-extractByteString ReadBuffer{..} len = do
-    src <- readIORef cur
+extractByteString (ReadBuffer WriteBuffer{..}) len = do
+    src <- readIORef offset
     bs <- create len $ \dst -> memcpy dst src len
-    writeIORef cur $! src `plusPtr` len
+    writeIORef offset $! src `plusPtr` len
     return bs
 
 data BufferOverrun = BufferOverrun -- ^ The buffer size is not enough
