@@ -34,7 +34,7 @@ module Network.ByteOrder (
   , word64
     -- *Utilities
   , unsafeWithByteString
-    -- *Class
+    -- *Class to read a buffer
   , Readable(..)
     -- *Reading from buffer
   , ReadBuffer
@@ -49,7 +49,6 @@ module Network.ByteOrder (
   , WriteBuffer(..)
   , newWriteBuffer
   , withWriteBuffer
-  , wind
   , writeWord8
   , shiftLastN
   , returnLength
@@ -328,13 +327,6 @@ data WriteBuffer = WriteBuffer {
 newWriteBuffer :: Buffer -> BufferSize -> IO WriteBuffer
 newWriteBuffer buf siz = WriteBuffer buf (buf `plusPtr` siz) <$> newIORef buf
 
-{-# INLINE wind #-}
-wind :: WriteBuffer -> Int -> IO ()
-wind WriteBuffer{..} n = do
-    ptr <- readIORef offset
-    let !ptr' = ptr `plusPtr` n
-    writeIORef offset ptr'
-
 {-# INLINE writeWord8 #-}
 writeWord8 :: WriteBuffer -> Word8 -> IO ()
 writeWord8 WriteBuffer{..} w = do
@@ -413,13 +405,25 @@ withWriteBuffer siz action = bracket (mallocBytes siz) free $ \buf -> do
 ----------------------------------------------------------------
 
 class Readable a where
+    -- | Getting the offset pointer
     currentOffset :: a -> IO Buffer
+    -- | Fast forward the offset pointer
+    ff :: a -> Int -> IO ()
 
 instance Readable WriteBuffer where
+    {-# INLINE currentOffset #-}
     currentOffset WriteBuffer{..} = readIORef offset
+    {-# INLINE ff #-}
+    ff WriteBuffer{..} n = do
+        ptr <- readIORef offset
+        let !ptr' = ptr `plusPtr` n
+        writeIORef offset ptr'
 
 instance Readable ReadBuffer where
-    currentOffset (ReadBuffer WriteBuffer{..}) = readIORef offset
+    {-# INLINE currentOffset #-}
+    currentOffset (ReadBuffer w) = currentOffset w
+    {-# INLINE ff #-}
+    ff (ReadBuffer w) = ff w
 
 ----------------------------------------------------------------
 
