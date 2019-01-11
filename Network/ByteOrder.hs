@@ -312,6 +312,7 @@ unsafeWithByteString (PS fptr off _) io = withForeignPtr fptr $
 
 ----------------------------------------------------------------
 
+-- | Read and write buffer.
 data WriteBuffer = WriteBuffer {
     start :: !Buffer
   , limit :: !Buffer
@@ -336,7 +337,11 @@ write8 WriteBuffer{..} w = do
         writeIORef offset ptr'
 
 {-# INLINE shiftLastN #-}
-shiftLastN :: WriteBuffer -> Int -> Int -> IO ()
+-- | Shifting the N-bytes area just before the current pointer.
+--   'Offset' is the distance from the offset pointer.
+--   If 'Offset' is positive, shift it to right.
+--   If 'Offset' is negative, shift it to left.
+shiftLastN :: WriteBuffer -> Offset -> Int -> IO ()
 shiftLastN WriteBuffer{..} 0 _   = return ()
 shiftLastN WriteBuffer{..} i len = do
     ptr <- readIORef offset
@@ -407,7 +412,7 @@ class Readable a where
     -- | Reading one byte as 'Int' and ff one byte. If buffer overrun occurs, -1 is returned.
     readInt :: a -> IO Int
     -- | Fast forward the offset pointer. The boundary is not checked.
-    ff :: a -> Int -> IO ()
+    ff :: a -> Offset -> IO ()
     -- | Checking if the remaining space is larger or equal to N.
     checkSpace :: a -> Int -> IO Bool
 
