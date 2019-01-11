@@ -34,6 +34,8 @@ module Network.ByteOrder (
   , word64
     -- *Utilities
   , unsafeWithByteString
+    -- *Class
+  , Readable(..)
     -- *Reading from buffer
   , ReadBuffer
   , withReadBuffer
@@ -48,13 +50,11 @@ module Network.ByteOrder (
   , newWriteBuffer
   , withWriteBuffer
   , wind
-  , readWord8
   , writeWord8
   , shiftLastN
   , returnLength
   , toByteString
   , copyByteString
-  , currentOffset
     -- *Re-exporting
   , Word8, Word16, Word32, Word64, ByteString
   ) where
@@ -335,10 +335,6 @@ wind WriteBuffer{..} n = do
     let !ptr' = ptr `plusPtr` n
     writeIORef offset ptr'
 
-{-# INLINE readWord8 #-}
-readWord8 :: WriteBuffer -> IO Word8
-readWord8 WriteBuffer{..} = readIORef offset >>= peek
-
 {-# INLINE writeWord8 #-}
 writeWord8 :: WriteBuffer -> Word8 -> IO ()
 writeWord8 WriteBuffer{..} w = do
@@ -414,8 +410,16 @@ withWriteBuffer siz action = bracket (mallocBytes siz) free $ \buf -> do
     action wbuf
     toByteString wbuf
 
-currentOffset :: WriteBuffer -> IO Buffer
-currentOffset WriteBuffer{..} = readIORef offset
+----------------------------------------------------------------
+
+class Readable a where
+    currentOffset :: a -> IO Buffer
+
+instance Readable WriteBuffer where
+    currentOffset WriteBuffer{..} = readIORef offset
+
+instance Readable ReadBuffer where
+    currentOffset (ReadBuffer WriteBuffer{..}) = readIORef offset
 
 ----------------------------------------------------------------
 
