@@ -39,8 +39,6 @@ module Network.ByteOrder (
     -- *Reading from buffer
   , ReadBuffer
   , withReadBuffer
-  , hasOneByte
-  , hasMoreBytes
   , extractByteString
     -- *Writing to buffer
   , WriteBuffer(..)
@@ -418,6 +416,8 @@ class Readable a where
     readInt :: a -> IO Int
     -- | Fast forward the offset pointer. The boundary is not checked.
     ff :: a -> Int -> IO ()
+    -- | Checking if the remaining space is larger or equal to N.
+    checkSpace :: a -> Int -> IO Bool
 
 instance Readable WriteBuffer where
     {-# INLINE read8 #-}
@@ -441,6 +441,10 @@ instance Readable WriteBuffer where
         ptr <- readIORef offset
         let !ptr' = ptr `plusPtr` n
         writeIORef offset ptr'
+    {-# INLINE checkSpace #-}
+    checkSpace WriteBuffer{..} n = do
+        ptr <- readIORef offset
+        return $! (limit `minusPtr` ptr) >= n
 
 instance Readable ReadBuffer where
     {-# INLINE read8 #-}
@@ -449,6 +453,8 @@ instance Readable ReadBuffer where
     readInt (ReadBuffer w) = readInt w
     {-# INLINE ff #-}
     ff (ReadBuffer w) = ff w
+    {-# INLINE checkSpace #-}
+    checkSpace (ReadBuffer w) = checkSpace w
 
 ----------------------------------------------------------------
 
@@ -464,18 +470,6 @@ withReadBuffer (PS fp off len) action = withForeignPtr fp $ \ptr -> do
         !ed = bg `plusPtr` len
     nsrc <- ReadBuffer . WriteBuffer bg ed <$> newIORef bg
     action nsrc
-
-{-# INLINE hasOneByte #-}
-hasOneByte :: ReadBuffer -> IO Bool
-hasOneByte (ReadBuffer WriteBuffer{..}) = do
-    ptr <- readIORef offset
-    return $! ptr < limit
-
-{-# INLINE hasMoreBytes #-}
-hasMoreBytes :: ReadBuffer -> Int -> IO Bool
-hasMoreBytes (ReadBuffer WriteBuffer{..}) n = do
-    ptr <- readIORef offset
-    return $! (limit `minusPtr` ptr) >= n
 
 -- | Extracting 'ByteString' from the current offset.
 --   Its length is specified by the 2nd argument.
