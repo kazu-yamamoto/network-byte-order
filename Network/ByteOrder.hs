@@ -47,7 +47,6 @@ module Network.ByteOrder (
   , write8
   , copyByteString
   , shiftLastN
-  , returnLength
   , toByteString
   , currentOffset
     -- *Re-exporting
@@ -381,19 +380,12 @@ copyByteString WriteBuffer{..} (PS fptr off len) = withForeignPtr fptr $ \ptr ->
         memcpy dst src len
         writeIORef offset dst'
 
+-- | Copy the area from 'start' to the current pointer to 'ByteString'.
 toByteString :: WriteBuffer -> IO ByteString
 toByteString WriteBuffer{..} = do
     ptr <- readIORef offset
     let !len = ptr `minusPtr` start
     create len $ \p -> memcpy p start len
-
-{-# INLINE returnLength #-}
-returnLength :: WriteBuffer -> IO () -> IO Int
-returnLength WriteBuffer{..} body = do
-    beg <- readIORef offset
-    body
-    end <- readIORef offset
-    return $ end `minusPtr` beg
 
 -- | Allocate a temporary buffer and copy the result to 'ByteString'.
 withWriteBuffer :: BufferSize -> (WriteBuffer -> IO ()) -> IO ByteString
