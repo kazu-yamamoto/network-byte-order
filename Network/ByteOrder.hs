@@ -41,7 +41,6 @@ module Network.ByteOrder (
   , withReadBuffer
   , hasOneByte
   , hasMoreBytes
-  , rewindOneByte
   , getByte
   , getByte'
   , extractByteString
@@ -451,10 +450,6 @@ hasMoreBytes :: ReadBuffer -> Int -> IO Bool
 hasMoreBytes (ReadBuffer WriteBuffer{..}) n = do
     ptr <- readIORef offset
     return $! (limit `minusPtr` ptr) >= n
-
-{-# INLINE rewindOneByte #-}
-rewindOneByte :: ReadBuffer -> IO ()
-rewindOneByte (ReadBuffer WriteBuffer{..}) = modifyIORef' offset (`plusPtr` (-1))
 
 {-# INLINE getByte #-}
 getByte :: ReadBuffer -> IO Word8
