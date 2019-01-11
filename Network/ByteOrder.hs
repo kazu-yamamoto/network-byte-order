@@ -46,11 +46,11 @@ module Network.ByteOrder (
   , WriteBuffer(..)
   , newWriteBuffer
   , withWriteBuffer
-  , writeWord8
+  , write8
+  , copyByteString
   , shiftLastN
   , returnLength
   , toByteString
-  , copyByteString
   , currentOffset
     -- *Re-exporting
   , Word8, Word16, Word32, Word64, ByteString
@@ -325,9 +325,11 @@ data WriteBuffer = WriteBuffer {
 newWriteBuffer :: Buffer -> BufferSize -> IO WriteBuffer
 newWriteBuffer buf siz = WriteBuffer buf (buf `plusPtr` siz) <$> newIORef buf
 
-{-# INLINE writeWord8 #-}
-writeWord8 :: WriteBuffer -> Word8 -> IO ()
-writeWord8 WriteBuffer{..} w = do
+{-# INLINE write8 #-}
+-- | Write one byte and ff one byte.
+--   If buffer overrun occurs, 'BufferOverrun' is thrown.
+write8 :: WriteBuffer -> Word8 -> IO ()
+write8 WriteBuffer{..} w = do
     ptr <- readIORef offset
     if ptr >= limit then
         throwIO BufferOverrun
@@ -368,6 +370,8 @@ shiftLastN WriteBuffer{..} i len = do
         shiftRight (dst `plusPtr` (-1)) (src `plusPtr` (-1)) (n - 1)
 
 {-# INLINE copyByteString #-}
+-- | Copy the content of 'ByteString' and ff its length.
+--   If buffer overrun occurs, 'BufferOverrun' is thrown.
 copyByteString :: WriteBuffer -> ByteString -> IO ()
 copyByteString WriteBuffer{..} (PS fptr off len) = withForeignPtr fptr $ \ptr -> do
     let src = ptr `plusPtr` off
@@ -473,6 +477,9 @@ hasMoreBytes (ReadBuffer WriteBuffer{..}) n = do
     ptr <- readIORef offset
     return $! (limit `minusPtr` ptr) >= n
 
+-- | Extracting 'ByteString' from the current offset.
+--   Its length is specified by the 2nd argument.
+--   FF the length finally.
 extractByteString :: ReadBuffer -> Int -> IO ByteString
 extractByteString (ReadBuffer WriteBuffer{..}) len = do
     src <- readIORef offset
