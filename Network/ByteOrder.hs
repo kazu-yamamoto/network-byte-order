@@ -46,6 +46,7 @@ module Network.ByteOrder (
     -- *Writing to buffer
   , WriteBuffer(..)
   , newWriteBuffer
+  , withWriteBuffer
   , wind
   , readWord8
   , writeWord8
@@ -53,7 +54,6 @@ module Network.ByteOrder (
   , returnLength
   , toByteString
   , copyByteString
-  , withTemporaryBuffer
   , currentOffset
     -- *Re-exporting
   , Word8, Word16, Word32, Word64, ByteString
@@ -324,6 +324,7 @@ data WriteBuffer = WriteBuffer {
   , offset :: !(IORef Buffer)
   }
 
+-- | Creating a write buffer with the given buffer.
 newWriteBuffer :: Buffer -> BufferSize -> IO WriteBuffer
 newWriteBuffer buf siz = WriteBuffer buf (buf `plusPtr` siz) <$> newIORef buf
 
@@ -406,8 +407,9 @@ returnLength WriteBuffer{..} body = do
     end <- readIORef offset
     return $ end `minusPtr` beg
 
-withTemporaryBuffer :: Int -> (WriteBuffer -> IO ()) -> IO ByteString
-withTemporaryBuffer siz action = bracket (mallocBytes siz) free $ \buf -> do
+-- | Allocate a temporary buffer and copy the result to 'ByteString'.
+withWriteBuffer :: BufferSize -> (WriteBuffer -> IO ()) -> IO ByteString
+withWriteBuffer siz action = bracket (mallocBytes siz) free $ \buf -> do
     wbuf <- newWriteBuffer buf 4096
     action wbuf
     toByteString wbuf
