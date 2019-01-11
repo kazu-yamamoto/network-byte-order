@@ -51,6 +51,7 @@ module Network.ByteOrder (
   , returnLength
   , toByteString
   , copyByteString
+  , currentOffset
     -- *Re-exporting
   , Word8, Word16, Word32, Word64, ByteString
   ) where
@@ -399,6 +400,11 @@ withWriteBuffer siz action = bracket (mallocBytes siz) free $ \buf -> do
     action wbuf
     toByteString wbuf
 
+{-# INLINE currentOffset #-}
+-- | Getting the offset pointer.
+currentOffset :: WriteBuffer -> IO Buffer
+currentOffset WriteBuffer{..} = readIORef offset
+
 ----------------------------------------------------------------
 
 class Readable a where
@@ -406,8 +412,6 @@ class Readable a where
     read8 :: a -> IO Word8
     -- | Reading one byte as 'Int' and ff one byte. If buffer overrun occurs, -1 is returned.
     readInt :: a -> IO Int
-    -- | Getting the offset pointer
-    currentOffset :: a -> IO Buffer
     -- | Fast forward the offset pointer. The boundary is not checked.
     ff :: a -> Int -> IO ()
 
@@ -428,8 +432,6 @@ instance Readable WriteBuffer where
             return i
           else
             return (-1)
-    {-# INLINE currentOffset #-}
-    currentOffset WriteBuffer{..} = readIORef offset
     {-# INLINE ff #-}
     ff WriteBuffer{..} n = do
         ptr <- readIORef offset
@@ -441,8 +443,6 @@ instance Readable ReadBuffer where
     read8 (ReadBuffer w) = read8 w
     {-# INLINE readInt #-}
     readInt (ReadBuffer w) = readInt w
-    {-# INLINE currentOffset #-}
-    currentOffset (ReadBuffer w) = currentOffset w
     {-# INLINE ff #-}
     ff (ReadBuffer w) = ff w
 
