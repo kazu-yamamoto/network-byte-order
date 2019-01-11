@@ -41,8 +41,6 @@ module Network.ByteOrder (
   , withReadBuffer
   , hasOneByte
   , hasMoreBytes
-  , getByte
-  , getByte'
   , extractByteString
     -- *Writing to buffer
   , WriteBuffer(..)
@@ -60,7 +58,7 @@ module Network.ByteOrder (
 import Control.Exception (bracket, throwIO, Exception)
 import Data.Bits (shiftR, shiftL, (.&.), (.|.))
 import Data.ByteString.Internal (ByteString(..), create, memcpy, ByteString(..), unsafeCreate)
-import Data.IORef (IORef, newIORef, readIORef, writeIORef, modifyIORef')
+import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import Data.Typeable
 import Data.Word (Word8, Word8, Word16, Word32, Word64)
 import Foreign.ForeignPtr (withForeignPtr, withForeignPtr)
@@ -404,12 +402,32 @@ withWriteBuffer siz action = bracket (mallocBytes siz) free $ \buf -> do
 ----------------------------------------------------------------
 
 class Readable a where
+    -- | Reading one byte as 'Word8' and ff one byte.
+    read8 :: a -> IO Word8
+    -- | Reading one byte as 'Int' and ff one byte. If buffer overrun occurs, -1 is returned.
+    readInt :: a -> IO Int
     -- | Getting the offset pointer
     currentOffset :: a -> IO Buffer
-    -- | Fast forward the offset pointer
+    -- | Fast forward the offset pointer. The boundary is not checked.
     ff :: a -> Int -> IO ()
 
 instance Readable WriteBuffer where
+    {-# INLINE read8 #-}
+    read8 WriteBuffer{..} = do
+        ptr <- readIORef offset
+        w <- peek ptr
+        writeIORef offset $! ptr `plusPtr` 1
+        return w
+    {-# INLINE readInt #-}
+    readInt WriteBuffer{..} = do
+        ptr <- readIORef offset
+        if ptr < limit then do
+            w <- peek ptr
+            writeIORef offset $! ptr `plusPtr` 1
+            let !i = fromIntegral w
+            return i
+          else
+            return (-1)
     {-# INLINE currentOffset #-}
     currentOffset WriteBuffer{..} = readIORef offset
     {-# INLINE ff #-}
@@ -419,6 +437,10 @@ instance Readable WriteBuffer where
         writeIORef offset ptr'
 
 instance Readable ReadBuffer where
+    {-# INLINE read8 #-}
+    read8 (ReadBuffer w) = read8 w
+    {-# INLINE readInt #-}
+    readInt (ReadBuffer w) = readInt w
     {-# INLINE currentOffset #-}
     currentOffset (ReadBuffer w) = currentOffset w
     {-# INLINE ff #-}
@@ -450,26 +472,6 @@ hasMoreBytes :: ReadBuffer -> Int -> IO Bool
 hasMoreBytes (ReadBuffer WriteBuffer{..}) n = do
     ptr <- readIORef offset
     return $! (limit `minusPtr` ptr) >= n
-
-{-# INLINE getByte #-}
-getByte :: ReadBuffer -> IO Word8
-getByte (ReadBuffer WriteBuffer{..}) = do
-    ptr <- readIORef offset
-    w <- peek ptr
-    writeIORef offset $! ptr `plusPtr` 1
-    return w
-
-{-# INLINE getByte' #-}
-getByte' :: ReadBuffer -> IO Int
-getByte' (ReadBuffer WriteBuffer{..}) = do
-    ptr <- readIORef offset
-    if ptr < limit then do
-        w <- peek ptr
-        writeIORef offset $! ptr `plusPtr` 1
-        let !i = fromIntegral w
-        return i
-      else
-        return (-1)
 
 extractByteString :: ReadBuffer -> Int -> IO ByteString
 extractByteString (ReadBuffer WriteBuffer{..}) len = do
