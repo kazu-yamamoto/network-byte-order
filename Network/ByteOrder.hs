@@ -78,8 +78,11 @@ import System.IO.Unsafe (unsafeDupablePerformIO)
 
 ----------------------------------------------------------------
 
+-- | A pointer to 'Word8'.
 type Buffer = Ptr Word8
+-- | Offset from the current pointer.
 type Offset = Int
+-- | Size of a buffer.
 type BufferSize = Int
 
 ----------------------------------------------------------------
@@ -414,8 +417,12 @@ currentOffset WriteBuffer{..} = readIORef offset
 
 ----------------------------------------------------------------
 
+-- | Read only buffer. To ensure that the internal is not modified,
+--   this is an abstract data type.
 newtype ReadBuffer = ReadBuffer WriteBuffer
 
+-- | Converting 'ByteString' to 'ReadBuffer' and run the action
+--   with it.
 withReadBuffer :: ByteString -> (ReadBuffer -> IO a) -> IO a
 withReadBuffer (PS fp off len) action = withForeignPtr fp $ \ptr -> do
     let !bg = ptr `plusPtr` off
