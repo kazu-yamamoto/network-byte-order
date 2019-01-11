@@ -34,6 +34,15 @@ module Network.ByteOrder (
   , word64
     -- *Utilities
   , unsafeWithByteString
+    -- *Reading from buffer
+  , ReadBuffer
+  , withReadBuffer
+  , hasOneByte
+  , hasMoreBytes
+  , rewindOneByte
+  , getByte
+  , getByte'
+  , extractByteString
     -- *Writing to buffer
   , WriteBuffer(..)
   , newWriteBuffer
@@ -46,15 +55,6 @@ module Network.ByteOrder (
   , copyByteString
   , withTemporaryBuffer
   , currentOffset
-    -- *Reading from buffer
-  , ReadBuffer
-  , withReadBuffer
-  , hasOneByte
-  , hasMoreBytes
-  , rewindOneByte
-  , getByte
-  , getByte'
-  , extractByteString
     -- *Re-exporting
   , Word8, Word16, Word32, Word64, ByteString
   ) where
