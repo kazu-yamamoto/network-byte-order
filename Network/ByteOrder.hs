@@ -39,6 +39,9 @@ module Network.ByteOrder (
     -- *Reading from buffer
   , ReadBuffer
   , withReadBuffer
+  , read16
+  , read24
+  , read32
   , extractByteString
     -- *Writing to buffer
   , WriteBuffer(..)
@@ -415,6 +418,8 @@ class Readable a where
     ff :: a -> Offset -> IO ()
     -- | Checking if the remaining space is larger or equal to N.
     checkSpace :: a -> Int -> IO Bool
+    -- | Getting the offset pointer.
+    unsafeCurrentOffset :: a -> IO Buffer
 
 instance Readable WriteBuffer where
     {-# INLINE read8 #-}
@@ -442,6 +447,8 @@ instance Readable WriteBuffer where
     checkSpace WriteBuffer{..} n = do
         ptr <- readIORef offset
         return $! (limit `minusPtr` ptr) >= n
+    {-# INLINE unsafeCurrentOffset #-}
+    unsafeCurrentOffset WriteBuffer{..} = readIORef offset
 
 instance Readable ReadBuffer where
     {-# INLINE read8 #-}
@@ -452,6 +459,8 @@ instance Readable ReadBuffer where
     ff (ReadBuffer w) = ff w
     {-# INLINE checkSpace #-}
     checkSpace (ReadBuffer w) = checkSpace w
+    {-# INLINE unsafeCurrentOffset #-}
+    unsafeCurrentOffset (ReadBuffer w) = unsafeCurrentOffset w
 
 ----------------------------------------------------------------
 
@@ -469,6 +478,7 @@ withReadBuffer (PS fp off len) action = withForeignPtr fp $ \ptr -> do
     action nsrc
 
 -- | Extracting 'ByteString' from the current offset.
+--   The contents is copied, not shared.
 --   Its length is specified by the 2nd argument.
 --   FF the length finally.
 extractByteString :: ReadBuffer -> Int -> IO ByteString
@@ -477,6 +487,27 @@ extractByteString (ReadBuffer WriteBuffer{..}) len = do
     bs <- create len $ \dst -> memcpy dst src len
     writeIORef offset $! src `plusPtr` len
     return bs
+
+read16 :: Readable a => a -> IO Word16
+read16 rbuf = do
+    buf <- unsafeCurrentOffset rbuf
+    w16 <- peek16 buf 0
+    ff rbuf 2
+    return w16
+
+read24 :: Readable a => a -> IO Word32
+read24 rbuf = do
+    buf <- unsafeCurrentOffset rbuf
+    w24 <- peek24 buf 0
+    ff rbuf 3
+    return w24
+
+read32 :: Readable a => a -> IO Word32
+read32 rbuf = do
+    buf <- unsafeCurrentOffset rbuf
+    w32 <- peek32 buf 0
+    ff rbuf 4
+    return w32
 
 data BufferOverrun = BufferOverrun -- ^ The buffer size is not enough
                      deriving (Eq,Show,Typeable)
