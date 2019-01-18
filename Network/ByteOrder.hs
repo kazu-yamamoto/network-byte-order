@@ -420,8 +420,12 @@ class Readable a where
     ff :: a -> Offset -> IO ()
     -- | Checking if the remaining space is larger or equal to N.
     checkSpace :: a -> Int -> IO Bool
-    -- | Executing an action on the current offset
+    -- | Executing an action on the current offset pointer.
     withCurrentOffSet :: a -> (Buffer -> IO b) -> IO b
+    -- | Memorizing the current offset pointer.
+    save :: a -> IO ()
+    -- | Getting how many bytes from the saved offset pinter.
+    savingSize :: a -> IO Int
 
 instance Readable WriteBuffer where
     {-# INLINE read8 #-}
@@ -451,6 +455,13 @@ instance Readable WriteBuffer where
         return $! (limit `minusPtr` ptr) >= n
     {-# INLINE withCurrentOffSet #-}
     withCurrentOffSet WriteBuffer{..} action = readIORef offset >>= action
+    {-# INLINE save #-}
+    save WriteBuffer{..} = readIORef offset >>= writeIORef oldoffset
+    {-# INLINE savingSize #-}
+    savingSize WriteBuffer{..} = do
+        old <- readIORef oldoffset
+        cur <- readIORef offset
+        return $ cur `minusPtr` old
 
 instance Readable ReadBuffer where
     {-# INLINE read8 #-}
@@ -463,6 +474,10 @@ instance Readable ReadBuffer where
     checkSpace (ReadBuffer w) = checkSpace w
     {-# INLINE withCurrentOffSet #-}
     withCurrentOffSet (ReadBuffer w) = withCurrentOffSet w
+    {-# INLINE save #-}
+    save (ReadBuffer w) = save w
+    {-# INLINE savingSize #-}
+    savingSize (ReadBuffer w) = savingSize w
 
 ----------------------------------------------------------------
 
@@ -493,7 +508,8 @@ extractByteString (ReadBuffer WriteBuffer{..}) len
     return bs
   | otherwise = do
     src <- (`plusPtr` len) <$> readIORef offset
-    bs <- create len $ \dst -> memcpy dst src len
+    let len' = negate len
+    bs <- create len' $ \dst -> memcpy dst src len'
     return bs
 
 -- | Reading two bytes as 'Word16' and ff two bytes.
