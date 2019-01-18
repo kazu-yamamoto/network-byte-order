@@ -480,12 +480,19 @@ withReadBuffer (PS fp off len) action = withForeignPtr fp $ \ptr -> do
 -- | Extracting 'ByteString' from the current offset.
 --   The contents is copied, not shared.
 --   Its length is specified by the 2nd argument.
---   FF the length finally.
+--   If the length is positive, the area after the current pointer is extracted and FF the length finally.
+--   If the length is negative, the area before the current pointer is extracted and does not FF.
 extractByteString :: ReadBuffer -> Int -> IO ByteString
-extractByteString (ReadBuffer WriteBuffer{..}) len = do
+extractByteString (ReadBuffer WriteBuffer{..}) len
+  | len == 0 = return mempty
+  | len >  0 = do
     src <- readIORef offset
     bs <- create len $ \dst -> memcpy dst src len
     writeIORef offset $! src `plusPtr` len
+    return bs
+  | otherwise = do
+    src <- (`plusPtr` len) <$> readIORef offset
+    bs <- create len $ \dst -> memcpy dst src len
     return bs
 
 read16 :: Readable a => a -> IO Word16
