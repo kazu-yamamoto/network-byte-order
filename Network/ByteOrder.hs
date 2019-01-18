@@ -418,8 +418,8 @@ class Readable a where
     ff :: a -> Offset -> IO ()
     -- | Checking if the remaining space is larger or equal to N.
     checkSpace :: a -> Int -> IO Bool
-    -- | Getting the offset pointer.
-    unsafeCurrentOffset :: a -> IO Buffer
+    -- | Executing an action on the current offset
+    withCurrentOffSet :: a -> (Buffer -> IO b) -> IO b
 
 instance Readable WriteBuffer where
     {-# INLINE read8 #-}
@@ -447,8 +447,8 @@ instance Readable WriteBuffer where
     checkSpace WriteBuffer{..} n = do
         ptr <- readIORef offset
         return $! (limit `minusPtr` ptr) >= n
-    {-# INLINE unsafeCurrentOffset #-}
-    unsafeCurrentOffset WriteBuffer{..} = readIORef offset
+    {-# INLINE withCurrentOffSet #-}
+    withCurrentOffSet WriteBuffer{..} action = readIORef offset >>= action
 
 instance Readable ReadBuffer where
     {-# INLINE read8 #-}
@@ -459,8 +459,8 @@ instance Readable ReadBuffer where
     ff (ReadBuffer w) = ff w
     {-# INLINE checkSpace #-}
     checkSpace (ReadBuffer w) = checkSpace w
-    {-# INLINE unsafeCurrentOffset #-}
-    unsafeCurrentOffset (ReadBuffer w) = unsafeCurrentOffset w
+    {-# INLINE withCurrentOffSet #-}
+    withCurrentOffSet (ReadBuffer w) = withCurrentOffSet w
 
 ----------------------------------------------------------------
 
@@ -497,22 +497,19 @@ extractByteString (ReadBuffer WriteBuffer{..}) len
 
 read16 :: Readable a => a -> IO Word16
 read16 rbuf = do
-    buf <- unsafeCurrentOffset rbuf
-    w16 <- peek16 buf 0
+    w16 <- withCurrentOffSet rbuf (\buf -> peek16 buf 0)
     ff rbuf 2
     return w16
 
 read24 :: Readable a => a -> IO Word32
 read24 rbuf = do
-    buf <- unsafeCurrentOffset rbuf
-    w24 <- peek24 buf 0
+    w24 <- withCurrentOffSet rbuf (\buf -> peek24 buf 0)
     ff rbuf 3
     return w24
 
 read32 :: Readable a => a -> IO Word32
 read32 rbuf = do
-    buf <- unsafeCurrentOffset rbuf
-    w32 <- peek32 buf 0
+    w32 <- withCurrentOffSet rbuf (\buf -> peek32 buf 0)
     ff rbuf 4
     return w32
 
