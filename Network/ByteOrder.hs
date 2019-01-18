@@ -320,11 +320,13 @@ data WriteBuffer = WriteBuffer {
     start :: !Buffer
   , limit :: !Buffer
   , offset :: !(IORef Buffer)
+  , oldoffset :: !(IORef Buffer)
   }
 
 -- | Creating a write buffer with the given buffer.
 newWriteBuffer :: Buffer -> BufferSize -> IO WriteBuffer
-newWriteBuffer buf siz = WriteBuffer buf (buf `plusPtr` siz) <$> newIORef buf
+newWriteBuffer buf siz =
+    WriteBuffer buf (buf `plusPtr` siz) <$> newIORef buf <*> newIORef buf
 
 {-# INLINE write8 #-}
 -- | Write one byte and ff one byte.
@@ -471,10 +473,9 @@ newtype ReadBuffer = ReadBuffer WriteBuffer
 -- | Converting 'ByteString' to 'ReadBuffer' and run the action
 --   with it.
 withReadBuffer :: ByteString -> (ReadBuffer -> IO a) -> IO a
-withReadBuffer (PS fp off len) action = withForeignPtr fp $ \ptr -> do
-    let !bg = ptr `plusPtr` off
-        !ed = bg `plusPtr` len
-    nsrc <- ReadBuffer . WriteBuffer bg ed <$> newIORef bg
+withReadBuffer (PS fp off siz) action = withForeignPtr fp $ \ptr -> do
+    let !buf = ptr `plusPtr` off
+    nsrc <- ReadBuffer <$> newWriteBuffer buf siz
     action nsrc
 
 -- | Extracting 'ByteString' from the current offset.
