@@ -495,18 +495,21 @@ extractByteString (ReadBuffer WriteBuffer{..}) len
     bs <- create len $ \dst -> memcpy dst src len
     return bs
 
+-- | Reading two bytes as 'Word16' and ff two bytes.
 read16 :: Readable a => a -> IO Word16
 read16 rbuf = do
     w16 <- withCurrentOffSet rbuf (\buf -> peek16 buf 0)
     ff rbuf 2
     return w16
 
+-- | Reading three bytes as 'Word32' and ff three bytes.
 read24 :: Readable a => a -> IO Word32
 read24 rbuf = do
     w24 <- withCurrentOffSet rbuf (\buf -> peek24 buf 0)
     ff rbuf 3
     return w24
 
+-- | Reading four bytes as 'Word32' and ff four bytes.
 read32 :: Readable a => a -> IO Word32
 read32 rbuf = do
     w32 <- withCurrentOffSet rbuf (\buf -> peek32 buf 0)
