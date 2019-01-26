@@ -48,6 +48,9 @@ module Network.ByteOrder (
   , newWriteBuffer
   , withWriteBuffer
   , write8
+  , write16
+  , write24
+  , write32
   , copyByteString
   , shiftLastN
   , toByteString
@@ -339,6 +342,39 @@ write8 WriteBuffer{..} w = do
       else do
         poke ptr w
         let !ptr' = ptr `plusPtr` 1
+        writeIORef offset ptr'
+
+{-# INLINE write16 #-}
+write16 :: WriteBuffer -> Word16 -> IO ()
+write16 WriteBuffer{..} w = do
+    ptr <- readIORef offset
+    if ptr `plusPtr` 1 >= limit then
+        throwIO BufferOverrun
+      else do
+        poke16 w ptr 0
+        let !ptr' = ptr `plusPtr` 2
+        writeIORef offset ptr'
+
+{-# INLINE write24 #-}
+write24 :: WriteBuffer -> Word32 -> IO ()
+write24 WriteBuffer{..} w = do
+    ptr <- readIORef offset
+    if ptr `plusPtr` 2 >= limit then
+        throwIO BufferOverrun
+      else do
+        poke24 w ptr 0
+        let !ptr' = ptr `plusPtr` 3
+        writeIORef offset ptr'
+
+{-# INLINE write32 #-}
+write32 :: WriteBuffer -> Word32 -> IO ()
+write32 WriteBuffer{..} w = do
+    ptr <- readIORef offset
+    if ptr `plusPtr` 3 >= limit then
+        throwIO BufferOverrun
+      else do
+        poke32 w ptr 0
+        let !ptr' = ptr `plusPtr` 4
         writeIORef offset ptr'
 
 {-# INLINE shiftLastN #-}
