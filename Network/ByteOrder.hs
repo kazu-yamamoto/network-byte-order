@@ -22,6 +22,7 @@ module Network.ByteOrder (
   , peek24
   , peek32
   , peek64
+  , peekByteString
     -- *From Word to ByteString
   , bytestring8
   , bytestring16
@@ -237,6 +238,9 @@ peek64 ptr off = do
     w6 <- (`shiftL`  8) . fromIntegral <$> peek8 ptr (off + 6)
     w7 <-                 fromIntegral <$> peek8 ptr (off + 7)
     return $ w0 .|. w1 .|. w2 .|. w3 .|. w4 .|. w5 .|. w6 .|. w7
+
+peekByteString :: Buffer -> Int -> IO ByteString
+peekByteString src len = create len $ \dst -> memcpy dst src len
 
 ----------------------------------------------------------------
 
