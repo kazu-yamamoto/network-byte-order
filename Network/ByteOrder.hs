@@ -538,19 +538,19 @@ withReadBuffer (PS fp off siz) action = withForeignPtr fp $ \ptr -> do
 --   Its length is specified by the 2nd argument.
 --   If the length is positive, the area after the current pointer is extracted and FF the length finally.
 --   If the length is negative, the area before the current pointer is extracted and does not FF.
-extractByteString :: ReadBuffer -> Int -> IO ByteString
-extractByteString (ReadBuffer WriteBuffer{..}) len
+extractByteString :: Readable a => a -> Int -> IO ByteString
+extractByteString wbuf len
   | len == 0 = return mempty
   | len >  0 = do
-    src <- readIORef offset
-    bs <- create len $ \dst -> memcpy dst src len
-    writeIORef offset $! src `plusPtr` len
+    bs <- withCurrentOffSet wbuf $ \src ->
+        create len $ \dst -> memcpy dst src len
+    ff wbuf len
     return bs
   | otherwise = do
-    src <- (`plusPtr` len) <$> readIORef offset
-    let len' = negate len
-    bs <- create len' $ \dst -> memcpy dst src len'
-    return bs
+    withCurrentOffSet wbuf $ \src0 -> do
+      let src = src0 `plusPtr` len
+      let len' = negate len
+      create len' $ \dst -> memcpy dst src len'
 
 -- | Reading two bytes as 'Word16' and ff two bytes.
 read16 :: Readable a => a -> IO Word16
