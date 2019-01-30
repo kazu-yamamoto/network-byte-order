@@ -458,8 +458,8 @@ class Readable a where
     readInt :: a -> IO Int
     -- | Fast forward the offset pointer. The boundary is not checked.
     ff :: a -> Offset -> IO ()
-    -- | Checking if the remaining space is larger or equal to N.
-    checkSpace :: a -> Int -> IO Bool
+    -- | Returning the length of the remaining
+    remainingSize :: a -> IO Int
     -- | Executing an action on the current offset pointer.
     withCurrentOffSet :: a -> (Buffer -> IO b) -> IO b
     -- | Memorizing the current offset pointer.
@@ -489,10 +489,10 @@ instance Readable WriteBuffer where
         ptr <- readIORef offset
         let !ptr' = ptr `plusPtr` n
         writeIORef offset ptr'
-    {-# INLINE checkSpace #-}
-    checkSpace WriteBuffer{..} n = do
+    {-# INLINE remainingSize #-}
+    remainingSize WriteBuffer{..} = do
         ptr <- readIORef offset
-        return $! (limit `minusPtr` ptr) >= n
+        return $! (limit `minusPtr` ptr)
     {-# INLINE withCurrentOffSet #-}
     withCurrentOffSet WriteBuffer{..} action = readIORef offset >>= action
     {-# INLINE save #-}
@@ -510,8 +510,8 @@ instance Readable ReadBuffer where
     readInt (ReadBuffer w) = readInt w
     {-# INLINE ff #-}
     ff (ReadBuffer w) = ff w
-    {-# INLINE checkSpace #-}
-    checkSpace (ReadBuffer w) = checkSpace w
+    {-# INLINE remainingSize #-}
+    remainingSize (ReadBuffer w) = remainingSize w
     {-# INLINE withCurrentOffSet #-}
     withCurrentOffSet (ReadBuffer w) = withCurrentOffSet w
     {-# INLINE save #-}
