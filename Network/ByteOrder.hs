@@ -349,6 +349,8 @@ write8 WriteBuffer{..} w = do
         writeIORef offset ptr'
 
 {-# INLINE write16 #-}
+-- | Write two bytes and ff one byte.
+--   If buffer overrun occurs, 'BufferOverrun' is thrown.
 write16 :: WriteBuffer -> Word16 -> IO ()
 write16 WriteBuffer{..} w = do
     ptr <- readIORef offset
@@ -360,6 +362,8 @@ write16 WriteBuffer{..} w = do
         writeIORef offset ptr'
 
 {-# INLINE write24 #-}
+-- | Write three bytes and ff one byte.
+--   If buffer overrun occurs, 'BufferOverrun' is thrown.
 write24 :: WriteBuffer -> Word32 -> IO ()
 write24 WriteBuffer{..} w = do
     ptr <- readIORef offset
@@ -371,6 +375,8 @@ write24 WriteBuffer{..} w = do
         writeIORef offset ptr'
 
 {-# INLINE write32 #-}
+-- | Write four bytes and ff one byte.
+--   If buffer overrun occurs, 'BufferOverrun' is thrown.
 write32 :: WriteBuffer -> Word32 -> IO ()
 write32 WriteBuffer{..} w = do
     ptr <- readIORef offset
