@@ -461,7 +461,7 @@ class Readable a where
     -- | Reading one byte as 'Word8' and ff one byte.
     read8 :: a -> IO Word8
     -- | Reading one byte as 'Int' and ff one byte. If buffer overrun occurs, -1 is returned.
-    readInt :: a -> IO Int
+    readInt8 :: a -> IO Int
     -- | Fast forward the offset pointer. The boundary is not checked.
     ff :: a -> Offset -> IO ()
     -- | Returning the length of the remaining
@@ -480,8 +480,8 @@ instance Readable WriteBuffer where
         w <- peek ptr
         writeIORef offset $! ptr `plusPtr` 1
         return w
-    {-# INLINE readInt #-}
-    readInt WriteBuffer{..} = do
+    {-# INLINE readInt8 #-}
+    readInt8 WriteBuffer{..} = do
         ptr <- readIORef offset
         if ptr < limit then do
             w <- peek ptr
@@ -512,8 +512,8 @@ instance Readable WriteBuffer where
 instance Readable ReadBuffer where
     {-# INLINE read8 #-}
     read8 (ReadBuffer w) = read8 w
-    {-# INLINE readInt #-}
-    readInt (ReadBuffer w) = readInt w
+    {-# INLINE readInt8 #-}
+    readInt8 (ReadBuffer w) = readInt8 w
     {-# INLINE ff #-}
     ff (ReadBuffer w) = ff w
     {-# INLINE remainingSize #-}
