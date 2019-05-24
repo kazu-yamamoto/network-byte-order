@@ -35,6 +35,8 @@ module Network.ByteOrder (
   , word64
     -- *Utilities
   , unsafeWithByteString
+  , copy
+  , bufferIO
     -- *Class to read a buffer
   , Readable(..)
     -- *Reading from buffer
@@ -66,7 +68,7 @@ import Data.ByteString.Internal (ByteString(..), create, memcpy, ByteString(..),
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import Data.Typeable
 import Data.Word (Word8, Word8, Word16, Word32, Word64)
-import Foreign.ForeignPtr (withForeignPtr, withForeignPtr)
+import Foreign.ForeignPtr (withForeignPtr, newForeignPtr_)
 import Foreign.Marshal.Alloc
 import Foreign.Ptr (Ptr, plusPtr, plusPtr, minusPtr)
 import Foreign.Storable (peek, poke, poke, peek)
@@ -319,6 +321,19 @@ word64 bs = unsafeDupablePerformIO $ unsafeWithByteString bs peek64
 unsafeWithByteString :: ByteString -> (Buffer -> Offset -> IO a) -> IO a
 unsafeWithByteString (PS fptr off _) io = withForeignPtr fptr $
     \ptr -> io ptr off
+
+-- | Copying the bytestring to the buffer.
+--   This function returns the point where the next copy should start.
+copy :: Buffer -> ByteString -> IO Buffer
+copy !ptr (PS fp o l) = withForeignPtr fp $ \p -> do
+    memcpy ptr (p `plusPtr` o) (fromIntegral l)
+    return $! ptr `plusPtr` l
+{-# INLINE copy #-}
+
+bufferIO :: Buffer -> Int -> (ByteString -> IO ()) -> IO ()
+bufferIO ptr siz io = do
+    fptr <- newForeignPtr_ ptr
+    io $ PS fptr 0 siz
 
 ----------------------------------------------------------------
 
