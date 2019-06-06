@@ -330,7 +330,7 @@ copy !ptr (PS fp o l) = withForeignPtr fp $ \p -> do
     return $! ptr `plusPtr` l
 {-# INLINE copy #-}
 
-bufferIO :: Buffer -> Int -> (ByteString -> IO ()) -> IO ()
+bufferIO :: Buffer -> Int -> (ByteString -> IO a) -> IO a
 bufferIO ptr siz io = do
     fptr <- newForeignPtr_ ptr
     io $ PS fptr 0 siz
