@@ -594,6 +594,7 @@ read32 rbuf = do
     ff rbuf 4
     return w32
 
+-- | Buffer overrun exception.
 data BufferOverrun = BufferOverrun -- ^ The buffer size is not enough
                      deriving (Eq,Show,Typeable)
 
