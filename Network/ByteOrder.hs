@@ -461,7 +461,7 @@ toByteString WriteBuffer{..} = do
 -- | Allocate a temporary buffer and copy the result to 'ByteString'.
 withWriteBuffer :: BufferSize -> (WriteBuffer -> IO ()) -> IO ByteString
 withWriteBuffer siz action = bracket (mallocBytes siz) free $ \buf -> do
-    wbuf <- newWriteBuffer buf 4096
+    wbuf <- newWriteBuffer buf siz
     action wbuf
     toByteString wbuf
 
