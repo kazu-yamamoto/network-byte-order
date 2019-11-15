@@ -46,6 +46,7 @@ module Network.ByteOrder (
   , read24
   , read32
   , extractByteString
+  , extractShortByteString
     -- *Writing to buffer
   , WriteBuffer(..)
   , newWriteBuffer
@@ -55,8 +56,10 @@ module Network.ByteOrder (
   , write24
   , write32
   , copyByteString
+  , copyShortByteString
   , shiftLastN
   , toByteString
+  , toShortByteString
   , currentOffset
     -- *Re-exporting
   , Word8, Word16, Word32, Word64, ByteString
@@ -65,6 +68,8 @@ module Network.ByteOrder (
 import Control.Exception (bracket, throwIO, Exception)
 import Data.Bits (shiftR, shiftL, (.&.), (.|.))
 import Data.ByteString.Internal (ByteString(..), create, memcpy, ByteString(..), unsafeCreate)
+import Data.ByteString.Short (ShortByteString)
+import qualified Data.ByteString.Short.Internal as Short
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import Data.Typeable
 import Data.Word (Word8, Word8, Word16, Word32, Word64)
@@ -451,12 +456,32 @@ copyByteString WriteBuffer{..} (PS fptr off len) = withForeignPtr fptr $ \ptr ->
         memcpy dst src len
         writeIORef offset dst'
 
+-- | Copy the content of 'ShortByteString' and ff its length.
+--   If buffer overrun occurs, 'BufferOverrun' is thrown.
+copyShortByteString :: WriteBuffer -> ShortByteString -> IO ()
+copyShortByteString WriteBuffer{..} sbs = do
+    dst <- readIORef offset
+    let len = Short.length sbs
+    let !dst' = dst `plusPtr` len
+    if dst' >= limit then
+        throwIO BufferOverrun
+      else do
+        Short.copyToPtr sbs 0 dst len
+        writeIORef offset dst'
+
 -- | Copy the area from 'start' to the current pointer to 'ByteString'.
 toByteString :: WriteBuffer -> IO ByteString
 toByteString WriteBuffer{..} = do
     ptr <- readIORef offset
     let !len = ptr `minusPtr` start
     create len $ \p -> memcpy p start len
+
+-- | Copy the area from 'start' to the current pointer to 'ShortByteString'.
+toShortByteString :: WriteBuffer -> IO ShortByteString
+toShortByteString WriteBuffer{..} = do
+    ptr <- readIORef offset
+    let !len = ptr `minusPtr` start
+    Short.createFromPtr start len
 
 -- | Allocate a temporary buffer and copy the result to 'ByteString'.
 withWriteBuffer :: BufferSize -> (WriteBuffer -> IO ()) -> IO ByteString
@@ -572,6 +597,24 @@ extractByteString wbuf len
       let src = src0 `plusPtr` len
       let len' = negate len
       create len' $ \dst -> memcpy dst src len'
+
+-- | Extracting 'ShortByteString' from the current offset.
+--   The contents is copied, not shared.
+--   Its length is specified by the 2nd argument.
+--   If the length is positive, the area after the current pointer is extracted and FF the length finally.
+--   If the length is negative, the area before the current pointer is extracted and does not FF.
+extractShortByteString :: Readable a => a -> Int -> IO ShortByteString
+extractShortByteString wbuf len
+  | len == 0 = return mempty
+  | len >  0 = do
+    sbs <- withCurrentOffSet wbuf $ \src -> Short.createFromPtr src len
+    ff wbuf len
+    return sbs
+  | otherwise = do
+    withCurrentOffSet wbuf $ \src0 -> do
+      let src = src0 `plusPtr` len
+      let len' = negate len
+      Short.createFromPtr src len'
 
 -- | Reading two bytes as 'Word16' and ff two bytes.
 read16 :: Readable a => a -> IO Word16
