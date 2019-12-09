@@ -51,6 +51,7 @@ module Network.ByteOrder (
   , WriteBuffer(..)
   , newWriteBuffer
   , withWriteBuffer
+  , withWriteBuffer'
   , write8
   , write16
   , write24
@@ -489,6 +490,15 @@ withWriteBuffer siz action = bracket (mallocBytes siz) free $ \buf -> do
     wbuf <- newWriteBuffer buf siz
     action wbuf
     toByteString wbuf
+
+-- | Allocate a temporary buffer and copy the result to 'ByteString' with
+--   an additional value.
+withWriteBuffer' :: BufferSize -> (WriteBuffer -> IO a) -> IO (ByteString, a)
+withWriteBuffer' siz action = bracket (mallocBytes siz) free $ \buf -> do
+    wbuf <- newWriteBuffer buf siz
+    x <- action wbuf
+    bs <- toByteString wbuf
+    return (bs,x)
 
 {-# INLINE currentOffset #-}
 -- | Getting the offset pointer.
