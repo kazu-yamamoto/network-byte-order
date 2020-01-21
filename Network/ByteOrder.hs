@@ -41,6 +41,7 @@ module Network.ByteOrder (
   , Readable(..)
     -- *Reading from buffer
   , ReadBuffer
+  , newReadBuffer
   , withReadBuffer
   , read16
   , read24
@@ -581,12 +582,16 @@ instance Readable ReadBuffer where
 --   this is an abstract data type.
 newtype ReadBuffer = ReadBuffer WriteBuffer
 
+-- | Creating a read buffer with the given buffer.
+newReadBuffer :: Buffer -> BufferSize -> IO ReadBuffer
+newReadBuffer buf siz = ReadBuffer <$> newWriteBuffer buf siz
+
 -- | Converting 'ByteString' to 'ReadBuffer' and run the action
 --   with it.
 withReadBuffer :: ByteString -> (ReadBuffer -> IO a) -> IO a
 withReadBuffer (PS fp off siz) action = withForeignPtr fp $ \ptr -> do
     let !buf = ptr `plusPtr` off
-    nsrc <- ReadBuffer <$> newWriteBuffer buf siz
+    nsrc <- newReadBuffer buf siz
     action nsrc
 
 -- | Extracting 'ByteString' from the current offset.
