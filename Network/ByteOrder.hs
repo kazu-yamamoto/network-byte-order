@@ -558,7 +558,7 @@ instance Readable WriteBuffer where
     {-# INLINE remainingSize #-}
     remainingSize WriteBuffer{..} = do
         ptr <- readIORef offset
-        return $ (limit `minusPtr` ptr)
+        return $ limit `minusPtr` ptr
     {-# INLINE withCurrentOffSet #-}
     withCurrentOffSet WriteBuffer{..} action = readIORef offset >>= action
     {-# INLINE save #-}
@@ -616,8 +616,7 @@ extractByteString wbuf len
         create len $ \dst -> memcpy dst src len
     ff wbuf len
     return bs
-  | otherwise = do
-    withCurrentOffSet wbuf $ \src0 -> do
+  | otherwise = withCurrentOffSet wbuf $ \src0 -> do
       let src = src0 `plusPtr` len
       let len' = negate len
       create len' $ \dst -> memcpy dst src len'
@@ -634,8 +633,7 @@ extractShortByteString wbuf len
     sbs <- withCurrentOffSet wbuf $ \src -> Short.createFromPtr src len
     ff wbuf len
     return sbs
-  | otherwise = do
-    withCurrentOffSet wbuf $ \src0 -> do
+  | otherwise = withCurrentOffSet wbuf $ \src0 -> do
       let src = src0 `plusPtr` len
       let len' = negate len
       Short.createFromPtr src len'
@@ -643,21 +641,21 @@ extractShortByteString wbuf len
 -- | Reading two bytes as 'Word16' and ff two bytes.
 read16 :: Readable a => a -> IO Word16
 read16 rbuf = do
-    w16 <- withCurrentOffSet rbuf (\buf -> peek16 buf 0)
+    w16 <- withCurrentOffSet rbuf (`peek16` 0)
     ff rbuf 2
     return w16
 
 -- | Reading three bytes as 'Word32' and ff three bytes.
 read24 :: Readable a => a -> IO Word32
 read24 rbuf = do
-    w24 <- withCurrentOffSet rbuf (\buf -> peek24 buf 0)
+    w24 <- withCurrentOffSet rbuf (`peek24` 0)
     ff rbuf 3
     return w24
 
 -- | Reading four bytes as 'Word32' and ff four bytes.
 read32 :: Readable a => a -> IO Word32
 read32 rbuf = do
-    w32 <- withCurrentOffSet rbuf (\buf -> peek32 buf 0)
+    w32 <- withCurrentOffSet rbuf (`peek32` 0)
     ff rbuf 4
     return w32
 
