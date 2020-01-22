@@ -369,6 +369,9 @@ newWriteBuffer buf siz =
 {-# INLINE write8 #-}
 -- | Write one byte and ff one byte.
 --   If buffer overrun occurs, 'BufferOverrun' is thrown.
+--
+-- >>> withWriteBuffer 1 $ \wbuf -> write8 wbuf 65
+-- "A"
 write8 :: WriteBuffer -> Word8 -> IO ()
 write8 WriteBuffer{..} w = do
     ptr <- readIORef offset
@@ -382,6 +385,9 @@ write8 WriteBuffer{..} w = do
 {-# INLINE write16 #-}
 -- | Write two bytes and ff one byte.
 --   If buffer overrun occurs, 'BufferOverrun' is thrown.
+--
+-- >>> withWriteBuffer 2 $ \wbuf -> write16 wbuf (65 * 256 + 66)
+-- "AB"
 write16 :: WriteBuffer -> Word16 -> IO ()
 write16 WriteBuffer{..} w = do
     ptr <- readIORef offset
@@ -395,6 +401,9 @@ write16 WriteBuffer{..} w = do
 {-# INLINE write24 #-}
 -- | Write three bytes and ff one byte.
 --   If buffer overrun occurs, 'BufferOverrun' is thrown.
+--
+-- >>> withWriteBuffer 3 $ \wbuf -> write24 wbuf (65 * 256^2 + 66 * 256 + 67)
+-- "ABC"
 write24 :: WriteBuffer -> Word32 -> IO ()
 write24 WriteBuffer{..} w = do
     ptr <- readIORef offset
@@ -408,6 +417,9 @@ write24 WriteBuffer{..} w = do
 {-# INLINE write32 #-}
 -- | Write four bytes and ff one byte.
 --   If buffer overrun occurs, 'BufferOverrun' is thrown.
+--
+-- >>> withWriteBuffer 4 $ \wbuf -> write32 wbuf (65 * 256^3 + 66 * 256^2 + 67 * 256 + 68)
+-- "ABCD"
 write32 :: WriteBuffer -> Word32 -> IO ()
 write32 WriteBuffer{..} w = do
     ptr <- readIORef offset
@@ -419,11 +431,18 @@ write32 WriteBuffer{..} w = do
         writeIORef offset ptr'
 
 {-# INLINE shiftLastN #-}
--- | Shifting the N-bytes area just before the current pointer.
---   'Offset' is the distance from the offset pointer.
---   If 'Offset' is positive, shift it to right.
---   If 'Offset' is negative, shift it to left.
-shiftLastN :: WriteBuffer -> Offset -> Int -> IO ()
+-- | Shifting the N-bytes area just before the current pointer (the 3rd argument).
+--   If the second argument is positive, shift it to right.
+--   If it is negative, shift it to left.
+--   'offset' moves as if it is sticky to the area.
+--
+-- >>> withWriteBuffer 16 $ \wbuf -> copyByteString wbuf "ABCD" >> shiftLastN wbuf 1 3
+-- "ABBCD"
+-- >>> withWriteBuffer 16 $ \wbuf -> copyByteString wbuf "ABCD" >> shiftLastN wbuf 2 3
+-- "ABCBCD"
+-- >>> withWriteBuffer 16 $ \wbuf -> copyByteString wbuf "ABCDE" >> shiftLastN wbuf (-2) 3 >> ff wbuf 2
+-- "CDEDE"
+shiftLastN :: WriteBuffer -> Int -> Int -> IO ()
 shiftLastN WriteBuffer{..} 0 _   = return ()
 shiftLastN WriteBuffer{..} i len = do
     ptr <- readIORef offset
@@ -456,6 +475,9 @@ shiftLastN WriteBuffer{..} i len = do
 {-# INLINE copyByteString #-}
 -- | Copy the content of 'ByteString' and ff its length.
 --   If buffer overrun occurs, 'BufferOverrun' is thrown.
+--
+-- >>> withWriteBuffer 3 $ \wbuf -> copyByteString wbuf "ABC"
+-- "ABC"
 copyByteString :: WriteBuffer -> ByteString -> IO ()
 copyByteString WriteBuffer{..} (PS fptr off len) = withForeignPtr fptr $ \ptr -> do
     let src = ptr `plusPtr` off
@@ -469,6 +491,9 @@ copyByteString WriteBuffer{..} (PS fptr off len) = withForeignPtr fptr $ \ptr ->
 
 -- | Copy the content of 'ShortByteString' and ff its length.
 --   If buffer overrun occurs, 'BufferOverrun' is thrown.
+--
+-- >>> withWriteBuffer 5 $ \wbuf -> copyShortByteString wbuf "ABCEF"
+-- "ABCEF"
 copyShortByteString :: WriteBuffer -> ShortByteString -> IO ()
 copyShortByteString WriteBuffer{..} sbs = do
     dst <- readIORef offset
@@ -495,13 +520,6 @@ toShortByteString WriteBuffer{..} = do
     Short.createFromPtr start len
 
 -- | Allocate a temporary buffer and copy the result to 'ByteString'.
---
--- >>> withWriteBuffer 1 $ \wbuf -> write8 wbuf 65
--- "A"
--- >>> withWriteBuffer 3 $ \wbuf -> copyByteString wbuf "ABC"
--- "ABC"
--- >>> withWriteBuffer 5 $ \wbuf -> copyShortByteString wbuf "ABCEF"
--- "ABCEF"
 withWriteBuffer :: BufferSize -> (WriteBuffer -> IO ()) -> IO ByteString
 withWriteBuffer siz action = bracket (mallocBytes siz) free $ \buf -> do
     wbuf <- newWriteBuffer buf siz
