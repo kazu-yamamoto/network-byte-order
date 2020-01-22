@@ -452,7 +452,7 @@ copyByteString WriteBuffer{..} (PS fptr off len) = withForeignPtr fptr $ \ptr ->
     let src = ptr `plusPtr` off
     dst <- readIORef offset
     let !dst' = dst `plusPtr` len
-    if dst' >= limit then
+    if dst' > limit then
         throwIO BufferOverrun
       else do
         memcpy dst src len
@@ -465,7 +465,7 @@ copyShortByteString WriteBuffer{..} sbs = do
     dst <- readIORef offset
     let len = Short.length sbs
     let !dst' = dst `plusPtr` len
-    if dst' >= limit then
+    if dst' > limit then
         throwIO BufferOverrun
       else do
         Short.copyToPtr sbs 0 dst len
