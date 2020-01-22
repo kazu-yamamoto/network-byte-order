@@ -330,6 +330,10 @@ unsafeWithByteString (PS fptr off _) io = withForeignPtr fptr $
 
 -- | Copying the bytestring to the buffer.
 --   This function returns the point where the next copy should start.
+--
+-- >>> let buf = "abc" :: ByteString
+-- >>> unsafeWithByteString buf $ \ptr _ -> Network.ByteOrder.copy ptr "ABC" >> return buf
+-- "ABC"
 copy :: Buffer -> ByteString -> IO Buffer
 copy ptr (PS fp o l) = withForeignPtr fp $ \p -> do
     memcpy ptr (p `plusPtr` o) (fromIntegral l)
