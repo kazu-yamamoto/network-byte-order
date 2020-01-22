@@ -622,14 +622,14 @@ withReadBuffer (PS fp off siz) action = withForeignPtr fp $ \ptr -> do
 -- >>> withReadBuffer "abcdefg" $ \rbuf -> ff rbuf 1 >> extractByteString rbuf 2
 -- "bc"
 extractByteString :: Readable a => a -> Int -> IO ByteString
-extractByteString wbuf len
+extractByteString rbuf len
   | len == 0 = return mempty
   | len >  0 = do
-    bs <- withCurrentOffSet wbuf $ \src ->
+    bs <- withCurrentOffSet rbuf $ \src ->
         create len $ \dst -> memcpy dst src len
-    ff wbuf len
+    ff rbuf len
     return bs
-  | otherwise = withCurrentOffSet wbuf $ \src0 -> do
+  | otherwise = withCurrentOffSet rbuf $ \src0 -> do
       let src = src0 `plusPtr` len
       let len' = negate len
       create len' $ \dst -> memcpy dst src len'
@@ -643,13 +643,13 @@ extractByteString wbuf len
 -- >>> withReadBuffer "abcdefg" $ \rbuf -> ff rbuf 2 >> extractShortByteString rbuf 3
 -- "cde"
 extractShortByteString :: Readable a => a -> Int -> IO ShortByteString
-extractShortByteString wbuf len
+extractShortByteString rbuf len
   | len == 0 = return mempty
   | len >  0 = do
-    sbs <- withCurrentOffSet wbuf $ \src -> Short.createFromPtr src len
-    ff wbuf len
+    sbs <- withCurrentOffSet rbuf $ \src -> Short.createFromPtr src len
+    ff rbuf len
     return sbs
-  | otherwise = withCurrentOffSet wbuf $ \src0 -> do
+  | otherwise = withCurrentOffSet rbuf $ \src0 -> do
       let src = src0 `plusPtr` len
       let len' = negate len
       Short.createFromPtr src len'
