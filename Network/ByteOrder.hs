@@ -340,6 +340,12 @@ copy ptr (PS fp o l) = withForeignPtr fp $ \p -> do
     return $ ptr `plusPtr` l
 {-# INLINE copy #-}
 
+-- | Converting the part of buffer to 'ByteString' and executing the
+--   action with it.
+--
+-- >>> let buf = "abcdef" :: ByteString
+-- >>> unsafeWithByteString buf $ \ptr _-> bufferIO ptr 2 return
+-- "ab"
 bufferIO :: Buffer -> Int -> (ByteString -> IO a) -> IO a
 bufferIO ptr siz io = do
     fptr <- newForeignPtr_ ptr
