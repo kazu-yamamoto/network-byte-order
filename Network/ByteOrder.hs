@@ -491,6 +491,8 @@ toShortByteString WriteBuffer{..} = do
 -- "A"
 -- >>> withWriteBuffer 3 $ \wbuf -> copyByteString wbuf "ABC"
 -- "ABC"
+-- >>> withWriteBuffer 5 $ \wbuf -> copyShortByteString wbuf "ABCEF"
+-- "ABCEF"
 withWriteBuffer :: BufferSize -> (WriteBuffer -> IO ()) -> IO ByteString
 withWriteBuffer siz action = bracket (mallocBytes siz) free $ \buf -> do
     wbuf <- newWriteBuffer buf siz
@@ -499,6 +501,9 @@ withWriteBuffer siz action = bracket (mallocBytes siz) free $ \buf -> do
 
 -- | Allocate a temporary buffer and copy the result to 'ByteString' with
 --   an additional value.
+--
+-- >>> withWriteBuffer' 1 $ \wbuf -> write8 wbuf 65 >> return 'a'
+-- ("A",'a')
 withWriteBuffer' :: BufferSize -> (WriteBuffer -> IO a) -> IO (ByteString, a)
 withWriteBuffer' siz action = bracket (mallocBytes siz) free $ \buf -> do
     wbuf <- newWriteBuffer buf siz
