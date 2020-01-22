@@ -1,4 +1,3 @@
-{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE RecordWildCards #-}
 
@@ -332,9 +331,9 @@ unsafeWithByteString (PS fptr off _) io = withForeignPtr fptr $
 -- | Copying the bytestring to the buffer.
 --   This function returns the point where the next copy should start.
 copy :: Buffer -> ByteString -> IO Buffer
-copy !ptr (PS fp o l) = withForeignPtr fp $ \p -> do
+copy ptr (PS fp o l) = withForeignPtr fp $ \p -> do
     memcpy ptr (p `plusPtr` o) (fromIntegral l)
-    return $! ptr `plusPtr` l
+    return $ ptr `plusPtr` l
 {-# INLINE copy #-}
 
 bufferIO :: Buffer -> Int -> (ByteString -> IO a) -> IO a
@@ -346,10 +345,10 @@ bufferIO ptr siz io = do
 
 -- | Read and write buffer.
 data WriteBuffer = WriteBuffer {
-    start :: !Buffer
-  , limit :: !Buffer
-  , offset :: !(IORef Buffer)
-  , oldoffset :: !(IORef Buffer)
+    start :: Buffer
+  , limit :: Buffer
+  , offset :: IORef Buffer
+  , oldoffset :: IORef Buffer
   }
 
 -- | Creating a write buffer with the given buffer.
@@ -367,7 +366,7 @@ write8 WriteBuffer{..} w = do
         throwIO BufferOverrun
       else do
         poke ptr w
-        let !ptr' = ptr `plusPtr` 1
+        let ptr' = ptr `plusPtr` 1
         writeIORef offset ptr'
 
 {-# INLINE write16 #-}
@@ -380,7 +379,7 @@ write16 WriteBuffer{..} w = do
         throwIO BufferOverrun
       else do
         poke16 w ptr 0
-        let !ptr' = ptr `plusPtr` 2
+        let ptr' = ptr `plusPtr` 2
         writeIORef offset ptr'
 
 {-# INLINE write24 #-}
@@ -393,7 +392,7 @@ write24 WriteBuffer{..} w = do
         throwIO BufferOverrun
       else do
         poke24 w ptr 0
-        let !ptr' = ptr `plusPtr` 3
+        let ptr' = ptr `plusPtr` 3
         writeIORef offset ptr'
 
 {-# INLINE write32 #-}
@@ -406,7 +405,7 @@ write32 WriteBuffer{..} w = do
         throwIO BufferOverrun
       else do
         poke32 w ptr 0
-        let !ptr' = ptr `plusPtr` 4
+        let ptr' = ptr `plusPtr` 4
         writeIORef offset ptr'
 
 {-# INLINE shiftLastN #-}
@@ -418,29 +417,29 @@ shiftLastN :: WriteBuffer -> Offset -> Int -> IO ()
 shiftLastN WriteBuffer{..} 0 _   = return ()
 shiftLastN WriteBuffer{..} i len = do
     ptr <- readIORef offset
-    let !ptr' = ptr `plusPtr` i
+    let ptr' = ptr `plusPtr` i
     if ptr' >= limit then
         throwIO BufferOverrun
       else if i < 0 then do
-        let !src = ptr `plusPtr` negate len
-            !dst = src `plusPtr` i
+        let src = ptr `plusPtr` negate len
+            dst = src `plusPtr` i
         shiftLeft dst src len
         writeIORef offset ptr'
       else do
-        let !src = ptr `plusPtr` (-1)
-            !dst = ptr' `plusPtr` (-1)
+        let src = ptr `plusPtr` (-1)
+            dst = ptr' `plusPtr` (-1)
         shiftRight dst src len
         writeIORef offset ptr'
   where
     -- memcpy cannot be used for overlapped areas.
     shiftLeft :: Buffer -> Buffer -> Int -> IO ()
     shiftLeft _    _    0   = return ()
-    shiftLeft !dst !src n = do
+    shiftLeft dst src n = do
         peek src >>= poke dst
         shiftLeft (dst `plusPtr` 1) (src `plusPtr` 1) (n - 1)
     shiftRight :: Buffer -> Buffer -> Int -> IO ()
     shiftRight _    _    0   = return ()
-    shiftRight !dst !src n = do
+    shiftRight dst src n = do
         peek src >>= poke dst
         shiftRight (dst `plusPtr` (-1)) (src `plusPtr` (-1)) (n - 1)
 
@@ -451,7 +450,7 @@ copyByteString :: WriteBuffer -> ByteString -> IO ()
 copyByteString WriteBuffer{..} (PS fptr off len) = withForeignPtr fptr $ \ptr -> do
     let src = ptr `plusPtr` off
     dst <- readIORef offset
-    let !dst' = dst `plusPtr` len
+    let dst' = dst `plusPtr` len
     if dst' > limit then
         throwIO BufferOverrun
       else do
@@ -464,7 +463,7 @@ copyShortByteString :: WriteBuffer -> ShortByteString -> IO ()
 copyShortByteString WriteBuffer{..} sbs = do
     dst <- readIORef offset
     let len = Short.length sbs
-    let !dst' = dst `plusPtr` len
+    let dst' = dst `plusPtr` len
     if dst' > limit then
         throwIO BufferOverrun
       else do
@@ -475,14 +474,14 @@ copyShortByteString WriteBuffer{..} sbs = do
 toByteString :: WriteBuffer -> IO ByteString
 toByteString WriteBuffer{..} = do
     ptr <- readIORef offset
-    let !len = ptr `minusPtr` start
+    let len = ptr `minusPtr` start
     create len $ \p -> memcpy p start len
 
 -- | Copy the area from 'start' to the current pointer to 'ShortByteString'.
 toShortByteString :: WriteBuffer -> IO ShortByteString
 toShortByteString WriteBuffer{..} = do
     ptr <- readIORef offset
-    let !len = ptr `minusPtr` start
+    let len = ptr `minusPtr` start
     Short.createFromPtr start len
 
 -- | Allocate a temporary buffer and copy the result to 'ByteString'.
@@ -539,27 +538,27 @@ instance Readable WriteBuffer where
     read8 WriteBuffer{..} = do
         ptr <- readIORef offset
         w <- peek ptr
-        writeIORef offset $! ptr `plusPtr` 1
+        writeIORef offset $ ptr `plusPtr` 1
         return w
     {-# INLINE readInt8 #-}
     readInt8 WriteBuffer{..} = do
         ptr <- readIORef offset
         if ptr < limit then do
             w <- peek ptr
-            writeIORef offset $! ptr `plusPtr` 1
-            let !i = fromIntegral w
+            writeIORef offset $ ptr `plusPtr` 1
+            let i = fromIntegral w
             return i
           else
             return (-1)
     {-# INLINE ff #-}
     ff WriteBuffer{..} n = do
         ptr <- readIORef offset
-        let !ptr' = ptr `plusPtr` n
+        let ptr' = ptr `plusPtr` n
         writeIORef offset ptr'
     {-# INLINE remainingSize #-}
     remainingSize WriteBuffer{..} = do
         ptr <- readIORef offset
-        return $! (limit `minusPtr` ptr)
+        return $ (limit `minusPtr` ptr)
     {-# INLINE withCurrentOffSet #-}
     withCurrentOffSet WriteBuffer{..} action = readIORef offset >>= action
     {-# INLINE save #-}
@@ -600,7 +599,7 @@ newReadBuffer buf siz = ReadBuffer <$> newWriteBuffer buf siz
 --   with it.
 withReadBuffer :: ByteString -> (ReadBuffer -> IO a) -> IO a
 withReadBuffer (PS fp off siz) action = withForeignPtr fp $ \ptr -> do
-    let !buf = ptr `plusPtr` off
+    let buf = ptr `plusPtr` off
     nsrc <- newReadBuffer buf siz
     action nsrc
 
