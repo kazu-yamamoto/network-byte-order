@@ -618,6 +618,9 @@ withReadBuffer (PS fp off siz) action = withForeignPtr fp $ \ptr -> do
 --   Its length is specified by the 2nd argument.
 --   If the length is positive, the area after the current pointer is extracted and FF the length finally.
 --   If the length is negative, the area before the current pointer is extracted and does not FF.
+--
+-- >>> withReadBuffer "abcdefg" $ \rbuf -> ff rbuf 1 >> extractByteString rbuf 2
+-- "bc"
 extractByteString :: Readable a => a -> Int -> IO ByteString
 extractByteString wbuf len
   | len == 0 = return mempty
@@ -636,6 +639,9 @@ extractByteString wbuf len
 --   Its length is specified by the 2nd argument.
 --   If the length is positive, the area after the current pointer is extracted and FF the length finally.
 --   If the length is negative, the area before the current pointer is extracted and does not FF.
+--
+-- >>> withReadBuffer "abcdefg" $ \rbuf -> ff rbuf 2 >> extractShortByteString rbuf 3
+-- "cde"
 extractShortByteString :: Readable a => a -> Int -> IO ShortByteString
 extractShortByteString wbuf len
   | len == 0 = return mempty
@@ -649,6 +655,9 @@ extractShortByteString wbuf len
       Short.createFromPtr src len'
 
 -- | Reading two bytes as 'Word16' and ff two bytes.
+--
+-- >>> withReadBuffer "\x0\x1\x2\x3" $ read16
+-- 1
 read16 :: Readable a => a -> IO Word16
 read16 rbuf = do
     w16 <- withCurrentOffSet rbuf (`peek16` 0)
@@ -656,6 +665,9 @@ read16 rbuf = do
     return w16
 
 -- | Reading three bytes as 'Word32' and ff three bytes.
+--
+-- >>> withReadBuffer "\x0\x1\x2\x3" $ read24
+-- 258
 read24 :: Readable a => a -> IO Word32
 read24 rbuf = do
     w24 <- withCurrentOffSet rbuf (`peek24` 0)
@@ -663,6 +675,9 @@ read24 rbuf = do
     return w24
 
 -- | Reading four bytes as 'Word32' and ff four bytes.
+--
+-- >>> withReadBuffer "\x0\x1\x2\x3" $ read32
+-- 66051
 read32 :: Readable a => a -> IO Word32
 read32 rbuf = do
     w32 <- withCurrentOffSet rbuf (`peek32` 0)
