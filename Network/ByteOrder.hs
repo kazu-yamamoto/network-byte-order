@@ -377,11 +377,11 @@ newWriteBuffer buf siz =
 write8 :: WriteBuffer -> Word8 -> IO ()
 write8 WriteBuffer{..} w = do
     ptr <- readIORef offset
-    if ptr >= limit then
+    let ptr' = ptr `plusPtr` 1
+    if ptr' > limit then
         throwIO BufferOverrun
       else do
         poke ptr w
-        let ptr' = ptr `plusPtr` 1
         writeIORef offset ptr'
 
 {-# INLINE write16 #-}
@@ -393,11 +393,11 @@ write8 WriteBuffer{..} w = do
 write16 :: WriteBuffer -> Word16 -> IO ()
 write16 WriteBuffer{..} w = do
     ptr <- readIORef offset
-    if ptr `plusPtr` 1 >= limit then
+    let ptr' = ptr `plusPtr` 2
+    if ptr' > limit then
         throwIO BufferOverrun
       else do
         poke16 w ptr 0
-        let ptr' = ptr `plusPtr` 2
         writeIORef offset ptr'
 
 {-# INLINE write24 #-}
@@ -409,11 +409,11 @@ write16 WriteBuffer{..} w = do
 write24 :: WriteBuffer -> Word32 -> IO ()
 write24 WriteBuffer{..} w = do
     ptr <- readIORef offset
-    if ptr `plusPtr` 2 >= limit then
+    let ptr' = ptr `plusPtr` 3
+    if ptr' > limit then
         throwIO BufferOverrun
       else do
         poke24 w ptr 0
-        let ptr' = ptr `plusPtr` 3
         writeIORef offset ptr'
 
 {-# INLINE write32 #-}
@@ -425,11 +425,11 @@ write24 WriteBuffer{..} w = do
 write32 :: WriteBuffer -> Word32 -> IO ()
 write32 WriteBuffer{..} w = do
     ptr <- readIORef offset
-    if ptr `plusPtr` 3 >= limit then
+    let ptr' = ptr `plusPtr` 4
+    if ptr' > limit then
         throwIO BufferOverrun
       else do
         poke32 w ptr 0
-        let ptr' = ptr `plusPtr` 4
         writeIORef offset ptr'
 
 {-# INLINE write64 #-}
@@ -438,11 +438,11 @@ write32 WriteBuffer{..} w = do
 write64 :: WriteBuffer -> Word64 -> IO ()
 write64 WriteBuffer{..} w = do
     ptr <- readIORef offset
-    if ptr `plusPtr` 7 >= limit then
+    let ptr' = ptr `plusPtr` 8
+    if ptr' > limit then
         throwIO BufferOverrun
       else do
         poke64 w ptr 0
-        let ptr' = ptr `plusPtr` 8
         writeIORef offset ptr'
 
 {-# INLINE shiftLastN #-}
