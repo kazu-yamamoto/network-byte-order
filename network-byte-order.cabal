@@ -2,7 +2,7 @@
 -- documentation, see http://haskell.org/cabal/users-guide/
 
 name:                network-byte-order
-version:             0.1.2.1
+version:             0.1.3.0
 synopsis:            Network byte order utilities
 description:         Peek and poke functions for network byte order.
 license:             BSD3
