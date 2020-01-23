@@ -45,6 +45,7 @@ module Network.ByteOrder (
   , read16
   , read24
   , read32
+  , read64
   , extractByteString
   , extractShortByteString
     -- *Writing to buffer
@@ -56,6 +57,7 @@ module Network.ByteOrder (
   , write16
   , write24
   , write32
+  , write64
   , copyByteString
   , copyShortByteString
   , shiftLastN
@@ -430,6 +432,19 @@ write32 WriteBuffer{..} w = do
         let ptr' = ptr `plusPtr` 4
         writeIORef offset ptr'
 
+{-# INLINE write64 #-}
+-- | Write four bytes and ff one byte.
+--   If buffer overrun occurs, 'BufferOverrun' is thrown.
+write64 :: WriteBuffer -> Word64 -> IO ()
+write64 WriteBuffer{..} w = do
+    ptr <- readIORef offset
+    if ptr `plusPtr` 7 >= limit then
+        throwIO BufferOverrun
+      else do
+        poke64 w ptr 0
+        let ptr' = ptr `plusPtr` 8
+        writeIORef offset ptr'
+
 {-# INLINE shiftLastN #-}
 -- | Shifting the N-bytes area just before the current pointer (the 3rd argument).
 --   If the second argument is positive, shift it to right.
@@ -701,6 +716,13 @@ read32 rbuf = do
     w32 <- withCurrentOffSet rbuf (`peek32` 0)
     ff rbuf 4
     return w32
+
+-- | Reading four bytes as 'Word64' and ff four bytes.
+read64 :: Readable a => a -> IO Word64
+read64 rbuf = do
+    w64 <- withCurrentOffSet rbuf (`peek64` 0)
+    ff rbuf 8
+    return w64
 
 -- | Buffer overrun exception.
 data BufferOverrun = BufferOverrun -- ^ The buffer size is not enough
