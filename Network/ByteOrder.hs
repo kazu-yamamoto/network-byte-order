@@ -379,11 +379,9 @@ write8 :: WriteBuffer -> Word8 -> IO ()
 write8 WriteBuffer{..} w = do
     ptr <- readIORef offset
     let ptr' = ptr `plusPtr` 1
-    if ptr' > limit then
-        throwIO BufferOverrun
-      else do
-        poke ptr w
-        writeIORef offset ptr'
+    when (ptr' > limit) $ throwIO BufferOverrun
+    poke ptr w
+    writeIORef offset ptr'
 
 {-# INLINE write16 #-}
 -- | Write two bytes and ff one byte.
@@ -395,11 +393,9 @@ write16 :: WriteBuffer -> Word16 -> IO ()
 write16 WriteBuffer{..} w = do
     ptr <- readIORef offset
     let ptr' = ptr `plusPtr` 2
-    if ptr' > limit then
-        throwIO BufferOverrun
-      else do
-        poke16 w ptr 0
-        writeIORef offset ptr'
+    when (ptr' > limit) $ throwIO BufferOverrun
+    poke16 w ptr 0
+    writeIORef offset ptr'
 
 {-# INLINE write24 #-}
 -- | Write three bytes and ff one byte.
@@ -411,11 +407,9 @@ write24 :: WriteBuffer -> Word32 -> IO ()
 write24 WriteBuffer{..} w = do
     ptr <- readIORef offset
     let ptr' = ptr `plusPtr` 3
-    if ptr' > limit then
-        throwIO BufferOverrun
-      else do
-        poke24 w ptr 0
-        writeIORef offset ptr'
+    when (ptr' > limit) $ throwIO BufferOverrun
+    poke24 w ptr 0
+    writeIORef offset ptr'
 
 {-# INLINE write32 #-}
 -- | Write four bytes and ff one byte.
@@ -427,11 +421,9 @@ write32 :: WriteBuffer -> Word32 -> IO ()
 write32 WriteBuffer{..} w = do
     ptr <- readIORef offset
     let ptr' = ptr `plusPtr` 4
-    if ptr' > limit then
-        throwIO BufferOverrun
-      else do
-        poke32 w ptr 0
-        writeIORef offset ptr'
+    when (ptr' > limit) $ throwIO BufferOverrun
+    poke32 w ptr 0
+    writeIORef offset ptr'
 
 {-# INLINE write64 #-}
 -- | Write four bytes and ff one byte.
@@ -440,11 +432,9 @@ write64 :: WriteBuffer -> Word64 -> IO ()
 write64 WriteBuffer{..} w = do
     ptr <- readIORef offset
     let ptr' = ptr `plusPtr` 8
-    if ptr' > limit then
-        throwIO BufferOverrun
-      else do
-        poke64 w ptr 0
-        writeIORef offset ptr'
+    when (ptr' > limit) $ throwIO BufferOverrun
+    poke64 w ptr 0
+    writeIORef offset ptr'
 
 {-# INLINE shiftLastN #-}
 -- | Shifting the N-bytes area just before the current pointer (the 3rd argument).
@@ -463,9 +453,8 @@ shiftLastN WriteBuffer{..} 0 _   = return ()
 shiftLastN WriteBuffer{..} i len = do
     ptr <- readIORef offset
     let ptr' = ptr `plusPtr` i
-    if ptr' >= limit then
-        throwIO BufferOverrun
-      else if i < 0 then do
+    when (ptr' >= limit) $ throwIO BufferOverrun
+    if i < 0 then do
         let src = ptr `plusPtr` negate len
             dst = src `plusPtr` i
         shiftLeft dst src len
@@ -499,11 +488,9 @@ copyByteString WriteBuffer{..} (PS fptr off len) = withForeignPtr fptr $ \ptr ->
     let src = ptr `plusPtr` off
     dst <- readIORef offset
     let dst' = dst `plusPtr` len
-    if dst' > limit then
-        throwIO BufferOverrun
-      else do
-        memcpy dst src len
-        writeIORef offset dst'
+    when (dst' > limit) $ throwIO BufferOverrun
+    memcpy dst src len
+    writeIORef offset dst'
 
 -- | Copy the content of 'ShortByteString' and ff its length.
 --   If buffer overrun occurs, 'BufferOverrun' is thrown.
@@ -515,11 +502,9 @@ copyShortByteString WriteBuffer{..} sbs = do
     dst <- readIORef offset
     let len = Short.length sbs
     let dst' = dst `plusPtr` len
-    if dst' > limit then
-        throwIO BufferOverrun
-      else do
-        Short.copyToPtr sbs 0 dst len
-        writeIORef offset dst'
+    when (dst' > limit) $ throwIO BufferOverrun
+    Short.copyToPtr sbs 0 dst len
+    writeIORef offset dst'
 
 -- | Copy the area from 'start' to the current pointer to 'ByteString'.
 toByteString :: WriteBuffer -> IO ByteString
@@ -581,9 +566,10 @@ instance Readable WriteBuffer where
     {-# INLINE read8 #-}
     read8 WriteBuffer{..} = do
         ptr <- readIORef offset
-        when (ptr >= limit) $ throwIO BufferOverrun
+        let ptr' = ptr `plusPtr` 1
+        when (ptr' > limit) $ throwIO BufferOverrun
         w <- peek ptr
-        writeIORef offset $ ptr `plusPtr` 1
+        writeIORef offset ptr'
         return w
     {-# INLINE readInt8 #-}
     readInt8 WriteBuffer{..} = do
