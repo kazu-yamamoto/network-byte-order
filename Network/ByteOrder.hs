@@ -69,6 +69,7 @@ module Network.ByteOrder (
   ) where
 
 import Control.Exception (bracket, throwIO, Exception)
+import Control.Monad (when)
 import Data.Bits (shiftR, shiftL, (.&.), (.|.))
 import Data.ByteString.Internal (ByteString(..), create, memcpy, ByteString(..), unsafeCreate)
 import Data.ByteString.Short (ShortByteString)
@@ -580,6 +581,7 @@ instance Readable WriteBuffer where
     {-# INLINE read8 #-}
     read8 WriteBuffer{..} = do
         ptr <- readIORef offset
+        when (ptr >= limit) $ throwIO BufferOverrun
         w <- peek ptr
         writeIORef offset $ ptr `plusPtr` 1
         return w
@@ -658,6 +660,7 @@ extractByteString :: Readable a => a -> Int -> IO ByteString
 extractByteString rbuf len
   | len == 0 = return mempty
   | len >  0 = do
+    checkR rbuf len
     bs <- withCurrentOffSet rbuf $ \src ->
         create len $ \dst -> memcpy dst src len
     ff rbuf len
@@ -679,6 +682,7 @@ extractShortByteString :: Readable a => a -> Int -> IO ShortByteString
 extractShortByteString rbuf len
   | len == 0 = return mempty
   | len >  0 = do
+    checkR rbuf len
     sbs <- withCurrentOffSet rbuf $ \src -> Short.createFromPtr src len
     ff rbuf len
     return sbs
@@ -693,6 +697,7 @@ extractShortByteString rbuf len
 -- 1
 read16 :: Readable a => a -> IO Word16
 read16 rbuf = do
+    checkR rbuf 2
     w16 <- withCurrentOffSet rbuf (`peek16` 0)
     ff rbuf 2
     return w16
@@ -703,6 +708,7 @@ read16 rbuf = do
 -- 258
 read24 :: Readable a => a -> IO Word32
 read24 rbuf = do
+    checkR rbuf 3
     w24 <- withCurrentOffSet rbuf (`peek24` 0)
     ff rbuf 3
     return w24
@@ -713,6 +719,7 @@ read24 rbuf = do
 -- 66051
 read32 :: Readable a => a -> IO Word32
 read32 rbuf = do
+    checkR rbuf 4
     w32 <- withCurrentOffSet rbuf (`peek32` 0)
     ff rbuf 4
     return w32
@@ -720,9 +727,15 @@ read32 rbuf = do
 -- | Reading four bytes as 'Word64' and ff four bytes.
 read64 :: Readable a => a -> IO Word64
 read64 rbuf = do
+    checkR rbuf 8
     w64 <- withCurrentOffSet rbuf (`peek64` 0)
     ff rbuf 8
     return w64
+
+checkR :: Readable a => a -> Int -> IO ()
+checkR rbuf siz = do
+    left <- remainingSize rbuf
+    when (left < siz) $ throwIO BufferOverrun
 
 -- | Buffer overrun exception.
 data BufferOverrun = BufferOverrun -- ^ The buffer size is not enough
