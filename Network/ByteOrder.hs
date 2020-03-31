@@ -51,6 +51,7 @@ module Network.ByteOrder (
     -- *Writing to buffer
   , WriteBuffer(..)
   , newWriteBuffer
+  , clearWriteBuffer
   , withWriteBuffer
   , withWriteBuffer'
   , write8
@@ -368,6 +369,12 @@ data WriteBuffer = WriteBuffer {
 newWriteBuffer :: Buffer -> BufferSize -> IO WriteBuffer
 newWriteBuffer buf siz =
     WriteBuffer buf (buf `plusPtr` siz) <$> newIORef buf <*> newIORef buf
+
+-- | Reseting a write buffer.
+clearWriteBuffer :: WriteBuffer -> IO ()
+clearWriteBuffer WriteBuffer{..} = do
+    writeIORef offset start
+    writeIORef oldoffset start
 
 {-# INLINE write8 #-}
 -- | Write one byte and ff one byte.
