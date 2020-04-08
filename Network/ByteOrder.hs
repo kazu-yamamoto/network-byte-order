@@ -568,6 +568,8 @@ class Readable a where
     save :: a -> IO ()
     -- | Getting how many bytes from the saved offset pinter.
     savingSize :: a -> IO Int
+    -- | Moving the offset point to the saved point.
+    goBack :: a -> IO ()
 
 instance Readable WriteBuffer where
     {-# INLINE read8 #-}
@@ -606,6 +608,10 @@ instance Readable WriteBuffer where
         old <- readIORef oldoffset
         cur <- readIORef offset
         return $ cur `minusPtr` old
+    {-# INLINE goBack #-}
+    goBack WriteBuffer{..} = do
+        old <- readIORef oldoffset
+        writeIORef offset old
 
 instance Readable ReadBuffer where
     {-# INLINE read8 #-}
@@ -622,6 +628,8 @@ instance Readable ReadBuffer where
     save (ReadBuffer w) = save w
     {-# INLINE savingSize #-}
     savingSize (ReadBuffer w) = savingSize w
+    {-# INLINE goBack #-}
+    goBack (ReadBuffer w) = goBack w
 
 ----------------------------------------------------------------
 
