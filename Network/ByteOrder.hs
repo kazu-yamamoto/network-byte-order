@@ -575,11 +575,12 @@ instance Readable WriteBuffer where
     {-# INLINE read8 #-}
     read8 WriteBuffer{..} = do
         ptr <- readIORef offset
-        let ptr' = ptr `plusPtr` 1
-        when (ptr' > limit) $ throwIO BufferOverrun
-        w <- peek ptr
-        writeIORef offset ptr'
-        return w
+        if ptr < limit then do
+            w <- peek ptr
+            writeIORef offset $ ptr `plusPtr` 1
+            return w
+          else
+            throwIO BufferOverrun
     {-# INLINE readInt8 #-}
     readInt8 WriteBuffer{..} = do
         ptr <- readIORef offset
@@ -594,6 +595,8 @@ instance Readable WriteBuffer where
     ff WriteBuffer{..} n = do
         ptr <- readIORef offset
         let ptr' = ptr `plusPtr` n
+        when (ptr' <  start) $ throwIO BufferOverrun
+        when (ptr' >= limit) $ throwIO BufferOverrun
         writeIORef offset ptr'
     {-# INLINE remainingSize #-}
     remainingSize WriteBuffer{..} = do
