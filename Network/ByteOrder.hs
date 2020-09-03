@@ -673,6 +673,7 @@ extractByteString rbuf len
       let src = src0 `plusPtr` len
       let len' = negate len
       create len' $ \dst -> memcpy dst src len'
+{-# INLINE extractByteString #-}
 
 -- | Extracting 'ShortByteString' from the current offset.
 --   The contents is copied, not shared.
@@ -694,6 +695,7 @@ extractShortByteString rbuf len
       let src = src0 `plusPtr` len
       let len' = negate len
       Short.createFromPtr src len'
+{-# INLINE extractShortByteString #-}
 
 -- | Reading two bytes as 'Word16' and ff two bytes.
 --
@@ -705,6 +707,7 @@ read16 rbuf = do
     w16 <- withCurrentOffSet rbuf (`peek16` 0)
     ff rbuf 2
     return w16
+{-# INLINE read16 #-}
 
 -- | Reading three bytes as 'Word32' and ff three bytes.
 --
@@ -716,6 +719,7 @@ read24 rbuf = do
     w24 <- withCurrentOffSet rbuf (`peek24` 0)
     ff rbuf 3
     return w24
+{-# INLINE read24 #-}
 
 -- | Reading four bytes as 'Word32' and ff four bytes.
 --
@@ -727,6 +731,7 @@ read32 rbuf = do
     w32 <- withCurrentOffSet rbuf (`peek32` 0)
     ff rbuf 4
     return w32
+{-# INLINE read32 #-}
 
 -- | Reading four bytes as 'Word64' and ff four bytes.
 read64 :: Readable a => a -> IO Word64
@@ -735,11 +740,13 @@ read64 rbuf = do
     w64 <- withCurrentOffSet rbuf (`peek64` 0)
     ff rbuf 8
     return w64
+{-# INLINE read64 #-}
 
 checkR :: Readable a => a -> Int -> IO ()
 checkR rbuf siz = do
     left <- remainingSize rbuf
     when (left < siz) $ throwIO BufferOverrun
+{-# INLINE checkR #-}
 
 -- | Buffer overrun exception.
 data BufferOverrun = BufferOverrun -- ^ The buffer size is not enough
