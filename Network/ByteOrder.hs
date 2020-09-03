@@ -456,7 +456,7 @@ write64 WriteBuffer{..} w = do
 -- >>> withWriteBuffer 16 $ \wbuf -> copyByteString wbuf "ABCDE" >> shiftLastN wbuf (-2) 3 >> ff wbuf 2
 -- "CDEDE"
 shiftLastN :: WriteBuffer -> Int -> Int -> IO ()
-shiftLastN WriteBuffer{..} 0 _   = return ()
+shiftLastN _ 0 _   = return ()
 shiftLastN WriteBuffer{..} i len = do
     ptr <- readIORef offset
     let ptr' = ptr `plusPtr` i
