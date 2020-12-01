@@ -24,6 +24,8 @@ jobs:
         - os: windows-latest
           ghc: "8.4"
         - os: windows-latest
+          ghc: "8.6"
+        - os: windows-latest
           ghc: "8.8"
         - os: macOS-latest
           ghc: "8.0"
@@ -31,6 +33,8 @@ jobs:
           ghc: "8.2"
         - os: macOS-latest
           ghc: "8.4"
+        - os: macOS-latest
+          ghc: "8.6"
         - os: macOS-latest
           ghc: "8.8"
 
