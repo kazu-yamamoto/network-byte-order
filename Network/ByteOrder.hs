@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE RecordWildCards #-}
 
@@ -78,7 +79,7 @@ import qualified Data.ByteString.Short.Internal as Short
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import Data.Typeable
 import Data.Word (Word8, Word8, Word16, Word32, Word64)
-import Foreign.ForeignPtr (withForeignPtr, newForeignPtr_)
+import Foreign.ForeignPtr (ForeignPtr, withForeignPtr, newForeignPtr_)
 import Foreign.Marshal.Alloc
 import Foreign.Ptr (Ptr, plusPtr, plusPtr, minusPtr)
 import Foreign.Storable (peek, poke, poke, peek)
@@ -348,7 +349,7 @@ word64 bs = unsafeDupablePerformIO $ unsafeWithByteString bs peek64
 --   of the 'ByteString'.
 --   Note that if a 'ByteString' is created newly, its offset is 0.
 unsafeWithByteString :: ByteString -> (Buffer -> Offset -> IO a) -> IO a
-unsafeWithByteString (PS fptr off _) io = withForeignPtr fptr $
+unsafeWithByteString bs io = flip withBS bs $ \fptr off _ -> withForeignPtr fptr $
     \ptr -> io ptr off
 
 -- | Copying the bytestring to the buffer.
@@ -358,7 +359,7 @@ unsafeWithByteString (PS fptr off _) io = withForeignPtr fptr $
 -- >>> unsafeWithByteString buf $ \ptr _ -> Network.ByteOrder.copy ptr "ABC" >> return buf
 -- "ABC"
 copy :: Buffer -> ByteString -> IO Buffer
-copy ptr (PS fp o l) = withForeignPtr fp $ \p -> do
+copy ptr = withBS $ \fp o l -> withForeignPtr fp $ \p -> do
     memcpy ptr (p `plusPtr` o) (fromIntegral l)
     return $ ptr `plusPtr` l
 {-# INLINE copy #-}
@@ -372,7 +373,7 @@ copy ptr (PS fp o l) = withForeignPtr fp $ \p -> do
 bufferIO :: Buffer -> Int -> (ByteString -> IO a) -> IO a
 bufferIO ptr siz io = do
     fptr <- newForeignPtr_ ptr
-    io $ PS fptr 0 siz
+    io $ mkBS fptr siz
 
 ----------------------------------------------------------------
 
@@ -509,7 +510,7 @@ shiftLastN WriteBuffer{..} i len = do
 -- >>> withWriteBuffer 3 $ \wbuf -> copyByteString wbuf "ABC"
 -- "ABC"
 copyByteString :: WriteBuffer -> ByteString -> IO ()
-copyByteString WriteBuffer{..} (PS fptr off len) = withForeignPtr fptr $ \ptr -> do
+copyByteString WriteBuffer{..} = withBS $ \fptr off len -> withForeignPtr fptr $ \ptr -> do
     let src = ptr `plusPtr` off
     dst <- readIORef offset
     let dst' = dst `plusPtr` len
@@ -669,7 +670,7 @@ newReadBuffer buf siz = ReadBuffer <$> newWriteBuffer buf siz
 -- | Converting 'ByteString' to 'ReadBuffer' and run the action
 --   with it.
 withReadBuffer :: ByteString -> (ReadBuffer -> IO a) -> IO a
-withReadBuffer (PS fp off siz) action = withForeignPtr fp $ \ptr -> do
+withReadBuffer bs action = flip withBS bs $ \fp off siz -> withForeignPtr fp $ \ptr -> do
     let buf = ptr `plusPtr` off
     nsrc <- newReadBuffer buf siz
     action nsrc
@@ -775,3 +776,20 @@ data BufferOverrun = BufferOverrun -- ^ The buffer size is not enough
                      deriving (Eq,Show,Typeable)
 
 instance Exception BufferOverrun
+
+----------------------------------------------------------------
+-- Compatibility helpers for bytestring
+
+withBS :: (ForeignPtr Word8 -> Offset -> BufferSize -> a) -> ByteString -> a
+#if MIN_VERSION_bytestring(0,11,0)
+withBS f (BS fptr len) = f fptr 0 len
+#else
+withBS f (PS fptr off len) = f fptr off len
+#endif
+
+mkBS :: ForeignPtr Word8 -> BufferSize -> ByteString
+#if MIN_VERSION_bytestring(0,11,0)
+mkBS fptr len = BS fptr len
+#else
+mkBS fptr len = PS fptr 0 len
+#endif
