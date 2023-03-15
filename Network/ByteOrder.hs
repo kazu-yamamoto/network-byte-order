@@ -85,6 +85,7 @@ import Foreign.Storable (peek, poke, poke, peek)
 import System.IO.Unsafe (unsafeDupablePerformIO)
 
 -- $setup
+-- >>> :set -XOverloadedStrings
 -- >>> import Data.ByteString hiding (foldl')
 -- >>> import Data.Word
 -- >>> import Data.List
@@ -426,7 +427,7 @@ write16 WriteBuffer{..} w = do
 -- | Write three bytes and ff one byte.
 --   If buffer overrun occurs, 'BufferOverrun' is thrown.
 --
--- >>> withWriteBuffer 3 $ \wbuf -> write24 wbuf (65 * 256^2 + 66 * 256 + 67)
+-- >>> withWriteBuffer 3 $ \wbuf -> write24 wbuf (65 * 256^(2 :: Int) + 66 * 256 + 67)
 -- "ABC"
 write24 :: WriteBuffer -> Word32 -> IO ()
 write24 WriteBuffer{..} w = do
@@ -440,7 +441,7 @@ write24 WriteBuffer{..} w = do
 -- | Write four bytes and ff one byte.
 --   If buffer overrun occurs, 'BufferOverrun' is thrown.
 --
--- >>> withWriteBuffer 4 $ \wbuf -> write32 wbuf (65 * 256^3 + 66 * 256^2 + 67 * 256 + 68)
+-- >>> withWriteBuffer 4 $ \wbuf -> write32 wbuf (65 * 256^(3 :: Int) + 66 * 256^(2 :: Int) + 67 * 256 + 68)
 -- "ABCD"
 write32 :: WriteBuffer -> Word32 -> IO ()
 write32 WriteBuffer{..} w = do
