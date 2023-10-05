@@ -586,6 +586,7 @@ class Readable a where
     -- | Returning the length of the remaining
     remainingSize :: a -> IO Int
     -- | Executing an action on the current offset pointer.
+    position :: a -> IO Int
     withCurrentOffSet :: a -> (Buffer -> IO b) -> IO b
     -- | Memorizing the current offset pointer.
     save :: a -> IO ()
@@ -625,6 +626,9 @@ instance Readable WriteBuffer where
     remainingSize WriteBuffer{..} = do
         ptr <- readIORef offset
         return $ limit `minusPtr` ptr
+    position WriteBuffer{..} = do
+        ptr <- readIORef offset
+        return $ ptr `minusPtr` start
     {-# INLINE withCurrentOffSet #-}
     withCurrentOffSet WriteBuffer{..} action = readIORef offset >>= action
     {-# INLINE save #-}
@@ -648,6 +652,8 @@ instance Readable ReadBuffer where
     ff (ReadBuffer w) = ff w
     {-# INLINE remainingSize #-}
     remainingSize (ReadBuffer w) = remainingSize w
+    {-# INLINE position #-}
+    position (ReadBuffer w) = position w
     {-# INLINE withCurrentOffSet #-}
     withCurrentOffSet (ReadBuffer w) = withCurrentOffSet w
     {-# INLINE save #-}
