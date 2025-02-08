@@ -2,86 +2,103 @@
 {-# LANGUAGE RecordWildCards #-}
 
 -- | Peek and poke functions for network byte order.
-
 module Network.ByteOrder (
-    -- *Types
-    Buffer
-  , Offset
-  , BufferSize
-  , BufferOverrun(..)
-    -- *Poking
-  , poke8
-  , poke16
-  , poke24
-  , poke32
-  , poke64
-    -- *Peeking
-  , peek8
-  , peek16
-  , peek24
-  , peek32
-  , peek64
-  , peekByteString
-    -- *From Word to ByteString
-  , bytestring8
-  , bytestring16
-  , bytestring32
-  , bytestring64
-    -- *From ByteString to Word
-  , word8
-  , word16
-  , word32
-  , word64
-    -- *Utilities
-  , unsafeWithByteString
-  , copy
-  , bufferIO
-    -- *Class to read a buffer
-  , Readable(..)
-    -- *Reading from buffer
-  , ReadBuffer
-  , newReadBuffer
-  , withReadBuffer
-  , read16
-  , read24
-  , read32
-  , read64
-  , extractByteString
-  , extractShortByteString
-    -- *Writing to buffer
-  , WriteBuffer(..)
-  , newWriteBuffer
-  , clearWriteBuffer
-  , withWriteBuffer
-  , withWriteBuffer'
-  , write8
-  , write16
-  , write24
-  , write32
-  , write64
-  , copyByteString
-  , copyShortByteString
-  , shiftLastN
-  , toByteString
-  , toShortByteString
-  , currentOffset
-    -- *Re-exporting
-  , Word8, Word16, Word32, Word64, ByteString
-  ) where
+    -- * Types
+    Buffer,
+    Offset,
+    BufferSize,
+    BufferOverrun (..),
 
-import Control.Exception (bracket, throwIO, Exception)
+    -- * Poking
+    poke8,
+    poke16,
+    poke24,
+    poke32,
+    poke64,
+
+    -- * Peeking
+    peek8,
+    peek16,
+    peek24,
+    peek32,
+    peek64,
+    peekByteString,
+
+    -- * From Word to ByteString
+    bytestring8,
+    bytestring16,
+    bytestring32,
+    bytestring64,
+
+    -- * From ByteString to Word
+    word8,
+    word16,
+    word32,
+    word64,
+
+    -- * Utilities
+    unsafeWithByteString,
+    copy,
+    bufferIO,
+
+    -- * Class to read a buffer
+    Readable (..),
+
+    -- * Reading from buffer
+    ReadBuffer,
+    newReadBuffer,
+    withReadBuffer,
+    read16,
+    read24,
+    read32,
+    read64,
+    extractByteString,
+    extractShortByteString,
+
+    -- * Writing to buffer
+    WriteBuffer (..),
+    newWriteBuffer,
+    clearWriteBuffer,
+    withWriteBuffer,
+    withWriteBuffer',
+    write8,
+    write16,
+    write24,
+    write32,
+    write64,
+    copyByteString,
+    copyShortByteString,
+    shiftLastN,
+    toByteString,
+    toShortByteString,
+    currentOffset,
+
+    -- * Re-exporting
+    Word8,
+    Word16,
+    Word32,
+    Word64,
+    ByteString,
+) where
+
+import Control.Exception (Exception, bracket, throwIO)
 import Control.Monad (when)
-import Data.Bits (shiftR, shiftL, (.&.), (.|.))
-import Data.ByteString.Internal (ByteString(..), create, memcpy, ByteString(..), unsafeCreate)
+import Data.Bits (shiftL, shiftR, (.&.), (.|.))
+import Data.ByteString.Internal (
+    ByteString (..),
+    create,
+    memcpy,
+    unsafeCreate,
+ )
 import Data.ByteString.Short (ShortByteString)
 import qualified Data.ByteString.Short.Internal as Short
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import Data.Typeable
-import Data.Word (Word8, Word8, Word16, Word32, Word64)
-import Foreign.ForeignPtr (withForeignPtr, newForeignPtr_)
+import Data.Word (Word16, Word32, Word64, Word8)
+import Foreign.ForeignPtr (newForeignPtr_, withForeignPtr)
 import Foreign.Marshal.Alloc
-import Foreign.Ptr (Ptr, plusPtr, plusPtr, minusPtr)
-import Foreign.Storable (peek, poke, poke, peek)
+import Foreign.Ptr (Ptr, minusPtr, plusPtr)
+import Foreign.Storable (peek, poke)
 import System.IO.Unsafe (unsafeDupablePerformIO)
 
 -- $setup
@@ -94,8 +111,10 @@ import System.IO.Unsafe (unsafeDupablePerformIO)
 
 -- | A pointer to 'Word8'.
 type Buffer = Ptr Word8
+
 -- | Offset from the current pointer.
 type Offset = Int
+
 -- | Size of a buffer.
 type BufferSize = Int
 
@@ -127,8 +146,8 @@ poke16 w ptr off = do
     poke8 w0 ptr off
     poke8 w1 ptr (off + 1)
   where
-    w0 = fromIntegral ((w `shiftR`  8) .&. 0xff)
-    w1 = fromIntegral  (w              .&. 0xff)
+    w0 = fromIntegral ((w `shiftR` 8) .&. 0xff)
+    w1 = fromIntegral (w .&. 0xff)
 {-# INLINE poke16 #-}
 
 -- |
@@ -144,8 +163,8 @@ poke24 w ptr off = do
     poke8 w2 ptr (off + 2)
   where
     w0 = fromIntegral ((w `shiftR` 16) .&. 0xff)
-    w1 = fromIntegral ((w `shiftR`  8) .&. 0xff)
-    w2 = fromIntegral  (w              .&. 0xff)
+    w1 = fromIntegral ((w `shiftR` 8) .&. 0xff)
+    w2 = fromIntegral (w .&. 0xff)
 {-# INLINE poke24 #-}
 
 -- |
@@ -163,8 +182,8 @@ poke32 w ptr off = do
   where
     w0 = fromIntegral ((w `shiftR` 24) .&. 0xff)
     w1 = fromIntegral ((w `shiftR` 16) .&. 0xff)
-    w2 = fromIntegral ((w `shiftR`  8) .&. 0xff)
-    w3 = fromIntegral  (w              .&. 0xff)
+    w2 = fromIntegral ((w `shiftR` 8) .&. 0xff)
+    w3 = fromIntegral (w .&. 0xff)
 {-# INLINE poke32 #-}
 
 -- |
@@ -190,8 +209,8 @@ poke64 w ptr off = do
     w3 = fromIntegral ((w `shiftR` 32) .&. 0xff)
     w4 = fromIntegral ((w `shiftR` 24) .&. 0xff)
     w5 = fromIntegral ((w `shiftR` 16) .&. 0xff)
-    w6 = fromIntegral ((w `shiftR`  8) .&. 0xff)
-    w7 = fromIntegral  (w              .&. 0xff)
+    w6 = fromIntegral ((w `shiftR` 8) .&. 0xff)
+    w7 = fromIntegral (w .&. 0xff)
 {-# INLINE poke64 #-}
 
 ----------------------------------------------------------------
@@ -213,7 +232,7 @@ peek8 ptr off = peek (ptr +. off)
 peek16 :: Buffer -> Offset -> IO Word16
 peek16 ptr off = do
     w0 <- (`shiftL` 8) . fromIntegral <$> peek8 ptr off
-    w1 <-                fromIntegral <$> peek8 ptr (off + 1)
+    w1 <- fromIntegral <$> peek8 ptr (off + 1)
     return $ w0 .|. w1
 {-# INLINE peek16 #-}
 
@@ -225,8 +244,8 @@ peek16 ptr off = do
 peek24 :: Buffer -> Offset -> IO Word32
 peek24 ptr off = do
     w0 <- (`shiftL` 16) . fromIntegral <$> peek8 ptr off
-    w1 <- (`shiftL`  8) . fromIntegral <$> peek8 ptr (off + 1)
-    w2 <-                 fromIntegral <$> peek8 ptr (off + 2)
+    w1 <- (`shiftL` 8) . fromIntegral <$> peek8 ptr (off + 1)
+    w2 <- fromIntegral <$> peek8 ptr (off + 2)
     return $ w0 .|. w1 .|. w2
 {-# INLINE peek24 #-}
 
@@ -239,8 +258,8 @@ peek32 :: Buffer -> Offset -> IO Word32
 peek32 ptr off = do
     w0 <- (`shiftL` 24) . fromIntegral <$> peek8 ptr off
     w1 <- (`shiftL` 16) . fromIntegral <$> peek8 ptr (off + 1)
-    w2 <- (`shiftL`  8) . fromIntegral <$> peek8 ptr (off + 2)
-    w3 <-                 fromIntegral <$> peek8 ptr (off + 3)
+    w2 <- (`shiftL` 8) . fromIntegral <$> peek8 ptr (off + 2)
+    w3 <- fromIntegral <$> peek8 ptr (off + 3)
     return $ w0 .|. w1 .|. w2 .|. w3
 {-# INLINE peek32 #-}
 
@@ -257,8 +276,8 @@ peek64 ptr off = do
     w3 <- (`shiftL` 32) . fromIntegral <$> peek8 ptr (off + 3)
     w4 <- (`shiftL` 24) . fromIntegral <$> peek8 ptr (off + 4)
     w5 <- (`shiftL` 16) . fromIntegral <$> peek8 ptr (off + 5)
-    w6 <- (`shiftL`  8) . fromIntegral <$> peek8 ptr (off + 6)
-    w7 <-                 fromIntegral <$> peek8 ptr (off + 7)
+    w6 <- (`shiftL` 8) . fromIntegral <$> peek8 ptr (off + 6)
+    w7 <- fromIntegral <$> peek8 ptr (off + 7)
     return $ w0 .|. w1 .|. w2 .|. w3 .|. w4 .|. w5 .|. w6 .|. w7
 {-# INLINE peek64 #-}
 
@@ -378,12 +397,12 @@ bufferIO ptr siz io = do
 ----------------------------------------------------------------
 
 -- | Read and write buffer.
-data WriteBuffer = WriteBuffer {
-    start :: Buffer
-  , limit :: Buffer
-  , offset :: IORef Buffer
-  , oldoffset :: IORef Buffer
-  }
+data WriteBuffer = WriteBuffer
+    { start :: Buffer
+    , limit :: Buffer
+    , offset :: IORef Buffer
+    , oldoffset :: IORef Buffer
+    }
 
 -- | Creating a write buffer with the given buffer.
 newWriteBuffer :: Buffer -> BufferSize -> IO WriteBuffer
@@ -475,30 +494,31 @@ write64 WriteBuffer{..} w = do
 -- >>> withWriteBuffer 16 $ \wbuf -> copyByteString wbuf "ABCDE" >> shiftLastN wbuf (-2) 3 >> ff wbuf 2
 -- "CDEDE"
 shiftLastN :: WriteBuffer -> Int -> Int -> IO ()
-shiftLastN _ 0 _   = return ()
+shiftLastN _ 0 _ = return ()
 shiftLastN WriteBuffer{..} i len = do
     ptr <- readIORef offset
     let ptr' = ptr `plusPtr` i
     when (ptr' >= limit) $ throwIO BufferOverrun
-    if i < 0 then do
-        let src = ptr `plusPtr` negate len
-            dst = src `plusPtr` i
-        shiftLeft dst src len
-        writeIORef offset ptr'
-      else do
-        let src = ptr `plusPtr` (-1)
-            dst = ptr' `plusPtr` (-1)
-        shiftRight dst src len
-        writeIORef offset ptr'
+    if i < 0
+        then do
+            let src = ptr `plusPtr` negate len
+                dst = src `plusPtr` i
+            shiftLeft dst src len
+            writeIORef offset ptr'
+        else do
+            let src = ptr `plusPtr` (-1)
+                dst = ptr' `plusPtr` (-1)
+            shiftRight dst src len
+            writeIORef offset ptr'
   where
     -- memcpy cannot be used for overlapped areas.
     shiftLeft :: Buffer -> Buffer -> Int -> IO ()
-    shiftLeft _    _    0   = return ()
+    shiftLeft _ _ 0 = return ()
     shiftLeft dst src n = do
         peek src >>= poke dst
         shiftLeft (dst `plusPtr` 1) (src `plusPtr` 1) (n - 1)
     shiftRight :: Buffer -> Buffer -> Int -> IO ()
-    shiftRight _    _    0   = return ()
+    shiftRight _ _ 0 = return ()
     shiftRight dst src n = do
         peek src >>= poke dst
         shiftRight (dst `plusPtr` (-1)) (src `plusPtr` (-1)) (n - 1)
@@ -567,7 +587,7 @@ withWriteBuffer' siz action = bracket (mallocBytes siz) free $ \buf -> do
     wbuf <- newWriteBuffer buf siz
     x <- action wbuf
     bs <- toByteString wbuf
-    return (bs,x)
+    return (bs, x)
 
 -- | Getting the offset pointer.
 currentOffset :: WriteBuffer -> IO Buffer
@@ -579,19 +599,27 @@ currentOffset WriteBuffer{..} = readIORef offset
 class Readable a where
     -- | Reading one byte as 'Word8' and ff one byte.
     read8 :: a -> IO Word8
+
     -- | Reading one byte as 'Int' and ff one byte. If buffer overrun occurs, -1 is returned.
     readInt8 :: a -> IO Int
+
     -- | Fast forward the offset pointer. The boundary is not checked.
     ff :: a -> Offset -> IO ()
+
     -- | Returning the length of the remaining
     remainingSize :: a -> IO Int
+
     -- | Executing an action on the current offset pointer.
     position :: a -> IO Int
+
     withCurrentOffSet :: a -> (Buffer -> IO b) -> IO b
+
     -- | Memorizing the current offset pointer.
     save :: a -> IO ()
+
     -- | Getting how many bytes from the saved offset pinter.
     savingSize :: a -> IO Int
+
     -- | Moving the offset point to the saved point.
     goBack :: a -> IO ()
 
@@ -599,22 +627,24 @@ instance Readable WriteBuffer where
     {-# INLINE read8 #-}
     read8 WriteBuffer{..} = do
         ptr <- readIORef offset
-        if ptr < limit then do
-            w <- peek ptr
-            writeIORef offset $ ptr `plusPtr` 1
-            return w
-          else
-            throwIO BufferOverrun
+        if ptr < limit
+            then do
+                w <- peek ptr
+                writeIORef offset $ ptr `plusPtr` 1
+                return w
+            else
+                throwIO BufferOverrun
     {-# INLINE readInt8 #-}
     readInt8 WriteBuffer{..} = do
         ptr <- readIORef offset
-        if ptr < limit then do
-            w <- peek ptr
-            writeIORef offset $ ptr `plusPtr` 1
-            let i = fromIntegral w
-            return i
-          else
-            return (-1)
+        if ptr < limit
+            then do
+                w <- peek ptr
+                writeIORef offset $ ptr `plusPtr` 1
+                let i = fromIntegral w
+                return i
+            else
+                return (-1)
     {-# INLINE ff #-}
     ff WriteBuffer{..} n = do
         ptr <- readIORef offset
@@ -691,17 +721,17 @@ withReadBuffer (PS fp off siz) action = withForeignPtr fp $ \ptr -> do
 -- "bc"
 extractByteString :: Readable a => a -> Int -> IO ByteString
 extractByteString rbuf len
-  | len == 0 = return mempty
-  | len >  0 = do
-    checkR rbuf len
-    bs <- withCurrentOffSet rbuf $ \src ->
-        create len $ \dst -> memcpy dst src len
-    ff rbuf len
-    return bs
-  | otherwise = withCurrentOffSet rbuf $ \src0 -> do
-      let src = src0 `plusPtr` len
-      let len' = negate len
-      create len' $ \dst -> memcpy dst src len'
+    | len == 0 = return mempty
+    | len > 0 = do
+        checkR rbuf len
+        bs <- withCurrentOffSet rbuf $ \src ->
+            create len $ \dst -> memcpy dst src len
+        ff rbuf len
+        return bs
+    | otherwise = withCurrentOffSet rbuf $ \src0 -> do
+        let src = src0 `plusPtr` len
+        let len' = negate len
+        create len' $ \dst -> memcpy dst src len'
 {-# INLINE extractByteString #-}
 
 -- | Extracting 'ShortByteString' from the current offset.
@@ -714,16 +744,16 @@ extractByteString rbuf len
 -- "cde"
 extractShortByteString :: Readable a => a -> Int -> IO ShortByteString
 extractShortByteString rbuf len
-  | len == 0 = return mempty
-  | len >  0 = do
-    checkR rbuf len
-    sbs <- withCurrentOffSet rbuf $ \src -> Short.createFromPtr src len
-    ff rbuf len
-    return sbs
-  | otherwise = withCurrentOffSet rbuf $ \src0 -> do
-      let src = src0 `plusPtr` len
-      let len' = negate len
-      Short.createFromPtr src len'
+    | len == 0 = return mempty
+    | len > 0 = do
+        checkR rbuf len
+        sbs <- withCurrentOffSet rbuf $ \src -> Short.createFromPtr src len
+        ff rbuf len
+        return sbs
+    | otherwise = withCurrentOffSet rbuf $ \src0 -> do
+        let src = src0 `plusPtr` len
+        let len' = negate len
+        Short.createFromPtr src len'
 {-# INLINE extractShortByteString #-}
 
 -- | Reading two bytes as 'Word16' and ff two bytes.
@@ -778,7 +808,9 @@ checkR rbuf siz = do
 {-# INLINE checkR #-}
 
 -- | Buffer overrun exception.
-data BufferOverrun = BufferOverrun -- ^ The buffer size is not enough
-                     deriving (Eq,Show,Typeable)
+data BufferOverrun
+    = -- | The buffer size is not enough
+      BufferOverrun
+    deriving (Eq, Show, Typeable)
 
 instance Exception BufferOverrun
