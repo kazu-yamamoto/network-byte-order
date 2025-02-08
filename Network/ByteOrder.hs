@@ -87,7 +87,6 @@ import Data.Bits (shiftL, shiftR, (.&.), (.|.))
 import Data.ByteString.Internal (
     ByteString (..),
     create,
-    memcpy,
     unsafeCreate,
  )
 import Data.ByteString.Short (ShortByteString)
@@ -97,6 +96,7 @@ import Data.Typeable
 import Data.Word (Word16, Word32, Word64, Word8)
 import Foreign.ForeignPtr (newForeignPtr_, withForeignPtr)
 import Foreign.Marshal.Alloc
+import Foreign.Marshal.Utils (copyBytes)
 import Foreign.Ptr (Ptr, minusPtr, plusPtr)
 import Foreign.Storable (peek, poke)
 import System.IO.Unsafe (unsafeDupablePerformIO)
@@ -282,7 +282,7 @@ peek64 ptr off = do
 {-# INLINE peek64 #-}
 
 peekByteString :: Buffer -> Int -> IO ByteString
-peekByteString src len = create len $ \dst -> memcpy dst src len
+peekByteString src len = create len $ \dst -> copyBytes dst src len
 {-# INLINE peekByteString #-}
 
 ----------------------------------------------------------------
@@ -379,7 +379,7 @@ unsafeWithByteString (PS fptr off _) io = withForeignPtr fptr $
 -- "ABC"
 copy :: Buffer -> ByteString -> IO Buffer
 copy ptr (PS fp o l) = withForeignPtr fp $ \p -> do
-    memcpy ptr (p `plusPtr` o) (fromIntegral l)
+    copyBytes ptr (p `plusPtr` o) (fromIntegral l)
     return $ ptr `plusPtr` l
 {-# INLINE copy #-}
 
@@ -511,7 +511,7 @@ shiftLastN WriteBuffer{..} i len = do
             shiftRight dst src len
             writeIORef offset ptr'
   where
-    -- memcpy cannot be used for overlapped areas.
+    -- copyBytes cannot be used for overlapped areas.
     shiftLeft :: Buffer -> Buffer -> Int -> IO ()
     shiftLeft _ _ 0 = return ()
     shiftLeft dst src n = do
@@ -535,7 +535,7 @@ copyByteString WriteBuffer{..} (PS fptr off len) = withForeignPtr fptr $ \ptr ->
     dst <- readIORef offset
     let dst' = dst `plusPtr` len
     when (dst' > limit) $ throwIO BufferOverrun
-    memcpy dst src len
+    copyBytes dst src len
     writeIORef offset dst'
 {-# INLINE copyByteString #-}
 
@@ -559,7 +559,7 @@ toByteString :: WriteBuffer -> IO ByteString
 toByteString WriteBuffer{..} = do
     ptr <- readIORef offset
     let len = ptr `minusPtr` start
-    create len $ \p -> memcpy p start len
+    create len $ \p -> copyBytes p start len
 {-# INLINE toByteString #-}
 
 -- | Copy the area from 'start' to the current pointer to 'ShortByteString'.
@@ -609,9 +609,10 @@ class Readable a where
     -- | Returning the length of the remaining
     remainingSize :: a -> IO Int
 
-    -- | Executing an action on the current offset pointer.
+    -- | Getting the current offset
     position :: a -> IO Int
 
+    -- | Executing an action on the current offset pointer.
     withCurrentOffSet :: a -> (Buffer -> IO b) -> IO b
 
     -- | Memorizing the current offset pointer.
@@ -725,13 +726,13 @@ extractByteString rbuf len
     | len > 0 = do
         checkR rbuf len
         bs <- withCurrentOffSet rbuf $ \src ->
-            create len $ \dst -> memcpy dst src len
+            create len $ \dst -> copyBytes dst src len
         ff rbuf len
         return bs
     | otherwise = withCurrentOffSet rbuf $ \src0 -> do
         let src = src0 `plusPtr` len
         let len' = negate len
-        create len' $ \dst -> memcpy dst src len'
+        create len' $ \dst -> copyBytes dst src len'
 {-# INLINE extractByteString #-}
 
 -- | Extracting 'ShortByteString' from the current offset.
