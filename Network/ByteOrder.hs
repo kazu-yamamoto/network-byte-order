@@ -610,6 +610,8 @@ class Readable a where
     remainingSize :: a -> IO Int
 
     -- | Getting the current offset
+    --
+    -- @since 0.1.7
     position :: a -> IO Int
 
     -- | Executing an action on the current offset pointer.
