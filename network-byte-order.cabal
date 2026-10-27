@@ -1,6 +1,6 @@
 cabal-version: >=1.10
 name:          network-byte-order
-version:       0.1.8
+version:       0.1.9
 license:       BSD3
 license-file:  LICENSE
 maintainer:    kazu@iij.ad.jp
@@ -9,6 +9,7 @@ synopsis:      Network byte order utilities
 description:   Peek and poke functions for network byte order.
 category:      Network
 build-type:    Simple
+extra-source-files: ChangeLog.md
 
 source-repository head
     type:     git

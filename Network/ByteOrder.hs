@@ -81,9 +81,10 @@ module Network.ByteOrder (
     ByteString,
 ) where
 
-import Control.Exception (Exception, bracket, throwIO)
+import Control.Exception (Exception, bracket, throw, throwIO)
 import Control.Monad (when)
 import Data.Bits (shiftL, shiftR, (.&.), (.|.))
+import qualified Data.ByteString as B
 import Data.ByteString.Internal (
     ByteString (..),
     create,
@@ -330,8 +331,12 @@ bytestring64 w = unsafeCreate 8 $ \ptr -> poke64 w ptr 0
 -- >>> let buf = pack [1,2,3,4,5,6,7,8]
 -- >>> word8 buf
 -- 1
+--
+-- 'BufferOverrun' is thrown if the length is not enough.
 word8 :: ByteString -> Word8
-word8 bs = unsafeDupablePerformIO $ unsafeWithByteString bs peek8
+word8 bs
+    | B.length bs < 1 = throw BufferOverrun
+    | otherwise = unsafeDupablePerformIO $ unsafeWithByteString bs peek8
 {-# NOINLINE word8 #-}
 
 -- |
@@ -340,7 +345,9 @@ word8 bs = unsafeDupablePerformIO $ unsafeWithByteString bs peek8
 -- >>> word16 buf
 -- 258
 word16 :: ByteString -> Word16
-word16 bs = unsafeDupablePerformIO $ unsafeWithByteString bs peek16
+word16 bs
+    | B.length bs < 2 = throw BufferOverrun
+    | otherwise = unsafeDupablePerformIO $ unsafeWithByteString bs peek16
 {-# NOINLINE word16 #-}
 
 -- |
@@ -349,7 +356,9 @@ word16 bs = unsafeDupablePerformIO $ unsafeWithByteString bs peek16
 -- >>> word32 buf
 -- 16909060
 word32 :: ByteString -> Word32
-word32 bs = unsafeDupablePerformIO $ unsafeWithByteString bs peek32
+word32 bs
+    | B.length bs < 4 = throw BufferOverrun
+    | otherwise = unsafeDupablePerformIO $ unsafeWithByteString bs peek32
 {-# NOINLINE word32 #-}
 
 -- |
@@ -357,8 +366,13 @@ word32 bs = unsafeDupablePerformIO $ unsafeWithByteString bs peek32
 -- >>> let buf = pack [1,2,3,4,5,6,7,8]
 -- >>> word64 buf
 -- 72623859790382856
+-- >>> word64 $ B.take 7 buf
+-- *** Exception: BufferOverrun
+-- ...
 word64 :: ByteString -> Word64
-word64 bs = unsafeDupablePerformIO $ unsafeWithByteString bs peek64
+word64 bs
+    | B.length bs < 8 = throw BufferOverrun
+    | otherwise = unsafeDupablePerformIO $ unsafeWithByteString bs peek64
 {-# NOINLINE word64 #-}
 
 ----------------------------------------------------------------
@@ -719,9 +733,15 @@ withReadBuffer (PS fp off siz) action = withForeignPtr fp $ \ptr -> do
 --   Its length is specified by the 2nd argument.
 --   If the length is positive, the area after the current pointer is extracted and FF the length finally.
 --   If the length is negative, the area before the current pointer is extracted and does not FF.
+--   If buffer overrun occurs, 'BufferOverrun' is thrown.
 --
 -- >>> withReadBuffer "abcdefg" $ \rbuf -> ff rbuf 1 >> extractByteString rbuf 2
 -- "bc"
+-- >>> withReadBuffer "abcdefg" $ \rbuf -> ff rbuf 3 >> extractByteString rbuf (-3)
+-- "abc"
+-- >>> withReadBuffer "abcdefg" $ \rbuf -> ff rbuf 3 >> extractByteString rbuf (-4)
+-- *** Exception: BufferOverrun
+-- ...
 extractByteString :: Readable a => a -> Int -> IO ByteString
 extractByteString rbuf len
     | len == 0 = return mempty
@@ -731,10 +751,13 @@ extractByteString rbuf len
             create len $ \dst -> copyBytes dst src len
         ff rbuf len
         return bs
-    | otherwise = withCurrentOffSet rbuf $ \src0 -> do
-        let src = src0 `plusPtr` len
-        let len' = negate len
-        create len' $ \dst -> copyBytes dst src len'
+    | otherwise = do
+        pos <- position rbuf
+        when (pos < negate len) $ throwIO BufferOverrun
+        withCurrentOffSet rbuf $ \src0 -> do
+            let src = src0 `plusPtr` len
+            let len' = negate len
+            create len' $ \dst -> copyBytes dst src len'
 {-# INLINE extractByteString #-}
 
 -- | Extracting 'ShortByteString' from the current offset.
@@ -742,6 +765,7 @@ extractByteString rbuf len
 --   Its length is specified by the 2nd argument.
 --   If the length is positive, the area after the current pointer is extracted and FF the length finally.
 --   If the length is negative, the area before the current pointer is extracted and does not FF.
+--   If buffer overrun occurs, 'BufferOverrun' is thrown.
 --
 -- >>> withReadBuffer "abcdefg" $ \rbuf -> ff rbuf 2 >> extractShortByteString rbuf 3
 -- "cde"
@@ -753,10 +777,13 @@ extractShortByteString rbuf len
         sbs <- withCurrentOffSet rbuf $ \src -> Short.createFromPtr src len
         ff rbuf len
         return sbs
-    | otherwise = withCurrentOffSet rbuf $ \src0 -> do
-        let src = src0 `plusPtr` len
-        let len' = negate len
-        Short.createFromPtr src len'
+    | otherwise = do
+        pos <- position rbuf
+        when (pos < negate len) $ throwIO BufferOverrun
+        withCurrentOffSet rbuf $ \src0 -> do
+            let src = src0 `plusPtr` len
+            let len' = negate len
+            Short.createFromPtr src len'
 {-# INLINE extractShortByteString #-}
 
 -- | Reading two bytes as 'Word16' and ff two bytes.
