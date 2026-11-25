@@ -1,4 +1,4 @@
-cabal-version: >=1.10
+cabal-version: 2.0
 name:          network-byte-order
 version:       0.1.9
 license:       BSD3
@@ -22,4 +22,4 @@ library
     ghc-options:        -Wall
     build-depends:
         base >=4.9 && <5,
-        bytestring
+        bytestring >=0.10.4
