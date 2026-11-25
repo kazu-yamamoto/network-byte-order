@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE RecordWildCards #-}
 
 -- | Peek and poke functions for network byte order.
@@ -93,7 +92,6 @@ import Data.ByteString.Internal (
 import Data.ByteString.Short (ShortByteString)
 import qualified Data.ByteString.Short.Internal as Short
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
-import Data.Typeable
 import Data.Word (Word16, Word32, Word64, Word8)
 import Foreign.ForeignPtr (newForeignPtr_, withForeignPtr)
 import Foreign.Marshal.Alloc
@@ -835,6 +833,6 @@ checkR rbuf siz = do
 data BufferOverrun
     = -- | The buffer size is not enough
       BufferOverrun
-    deriving (Eq, Show, Typeable)
+    deriving (Eq, Show)
 
 instance Exception BufferOverrun
