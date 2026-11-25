@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE RecordWildCards #-}
 
 -- | Peek and poke functions for network byte order.
@@ -93,11 +92,10 @@ import Data.ByteString.Internal (
 import Data.ByteString.Short (ShortByteString)
 import qualified Data.ByteString.Short.Internal as Short
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
-import Data.Typeable
 import Data.Word (Word16, Word32, Word64, Word8)
 import Foreign.ForeignPtr (newForeignPtr_, withForeignPtr)
 import Foreign.Marshal.Alloc
-import Foreign.Marshal.Utils (copyBytes)
+import Foreign.Marshal.Utils (copyBytes, moveBytes)
 import Foreign.Ptr (Ptr, minusPtr, plusPtr)
 import Foreign.Storable (peek, poke)
 import System.IO.Unsafe (unsafeDupablePerformIO)
@@ -507,35 +505,29 @@ write64 WriteBuffer{..} w = do
 -- "ABCBCD"
 -- >>> withWriteBuffer 16 $ \wbuf -> copyByteString wbuf "ABCDE" >> shiftLastN wbuf (-2) 3 >> ff wbuf 2
 -- "CDEDE"
+-- >>> B.drop 12 <$> withWriteBuffer 16 (\wbuf -> copyByteString wbuf "ABCD" >> shiftLastN wbuf 12 4)
+-- "ABCD"
+-- >>> withWriteBuffer 16 $ \wbuf -> copyByteString wbuf "AB" >> shiftLastN wbuf (-4) 2
+-- *** Exception: BufferOverrun
+-- ...
+-- >>> withWriteBuffer 16 $ \wbuf -> copyByteString wbuf "AB" >> shiftLastN wbuf 1 3
+-- *** Exception: BufferOverrun
+-- ...
+-- >>> withWriteBuffer 16 $ \wbuf -> copyByteString wbuf "AB" >> shiftLastN wbuf 1 (-1)
+-- *** Exception: BufferOverrun
+-- ...
 shiftLastN :: WriteBuffer -> Int -> Int -> IO ()
 shiftLastN _ 0 _ = return ()
 shiftLastN WriteBuffer{..} i len = do
     ptr <- readIORef offset
-    let ptr' = ptr `plusPtr` i
-    when (ptr' >= limit) $ throwIO BufferOverrun
-    if i < 0
-        then do
-            let src = ptr `plusPtr` negate len
-                dst = src `plusPtr` i
-            shiftLeft dst src len
-            writeIORef offset ptr'
-        else do
-            let src = ptr `plusPtr` (-1)
-                dst = ptr' `plusPtr` (-1)
-            shiftRight dst src len
-            writeIORef offset ptr'
-  where
-    -- copyBytes cannot be used for overlapped areas.
-    shiftLeft :: Buffer -> Buffer -> Int -> IO ()
-    shiftLeft _ _ 0 = return ()
-    shiftLeft dst src n = do
-        peek src >>= poke dst
-        shiftLeft (dst `plusPtr` 1) (src `plusPtr` 1) (n - 1)
-    shiftRight :: Buffer -> Buffer -> Int -> IO ()
-    shiftRight _ _ 0 = return ()
-    shiftRight dst src n = do
-        peek src >>= poke dst
-        shiftRight (dst `plusPtr` (-1)) (src `plusPtr` (-1)) (n - 1)
+    let src = ptr `plusPtr` negate len
+        dst = src `plusPtr` i
+        ptr' = ptr `plusPtr` i
+    when (len < 0 || src < start || dst < start || ptr' > limit) $
+        throwIO BufferOverrun
+    -- moveBytes handles overlapped areas.
+    moveBytes dst src len
+    writeIORef offset ptr'
 {-# INLINE shiftLastN #-}
 
 -- | Copy the content of 'ByteString' and ff its length.
@@ -841,6 +833,6 @@ checkR rbuf siz = do
 data BufferOverrun
     = -- | The buffer size is not enough
       BufferOverrun
-    deriving (Eq, Show, Typeable)
+    deriving (Eq, Show)
 
 instance Exception BufferOverrun
