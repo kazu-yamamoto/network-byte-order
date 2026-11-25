@@ -1,5 +1,10 @@
 # ChangeLog for network-byte-order
 
+## Unreleased
+
+* Check bounds in shiftLastN
+  [#5](https://github.com/kazu-yamamoto/network-byte-order/pull/5)
+
 ## 0.1.9
 
 * Security: `word8`, `word16`, `word32` and `word64` read beyond the
