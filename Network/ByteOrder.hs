@@ -391,7 +391,7 @@ unsafeWithByteString (PS fptr off _) io = withForeignPtr fptr $
 -- "ABC"
 copy :: Buffer -> ByteString -> IO Buffer
 copy ptr (PS fp o l) = withForeignPtr fp $ \p -> do
-    copyBytes ptr (p `plusPtr` o) (fromIntegral l)
+    copyBytes ptr (p `plusPtr` o) l
     return $ ptr `plusPtr` l
 {-# INLINE copy #-}
 
@@ -665,6 +665,7 @@ instance Readable WriteBuffer where
     remainingSize WriteBuffer{..} = do
         ptr <- readIORef offset
         return $ limit `minusPtr` ptr
+    {-# INLINE position #-}
     position WriteBuffer{..} = do
         ptr <- readIORef offset
         return $ ptr `minusPtr` start
