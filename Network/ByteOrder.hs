@@ -280,6 +280,10 @@ peek64 ptr off = do
     return $ w0 .|. w1 .|. w2 .|. w3 .|. w4 .|. w5 .|. w6 .|. w7
 {-# INLINE peek64 #-}
 
+-- | Copying the given length of the buffer to a newly created 'ByteString'.
+--
+-- >>> unsafeWithByteString "abcdef" $ \ptr off -> peekByteString (ptr `plusPtr` off) 3
+-- "abc"
 peekByteString :: Buffer -> Int -> IO ByteString
 peekByteString src len = create len $ \dst -> copyBytes dst src len
 {-# INLINE peekByteString #-}
@@ -330,7 +334,7 @@ bytestring64 w = unsafeCreate 8 $ \ptr -> poke64 w ptr 0
 -- >>> word8 buf
 -- 1
 --
--- 'BufferOverrun' is thrown if the length is not enough.
+-- t'BufferOverrun' is thrown if the length is not enough.
 word8 :: ByteString -> Word8
 word8 bs
     | B.length bs < 1 = throw BufferOverrun
@@ -428,7 +432,7 @@ clearWriteBuffer WriteBuffer{..} = do
     writeIORef oldoffset start
 
 -- | Write one byte and ff one byte.
---   If buffer overrun occurs, 'BufferOverrun' is thrown.
+--   If buffer overrun occurs, t'BufferOverrun' is thrown.
 --
 -- >>> withWriteBuffer 1 $ \wbuf -> write8 wbuf 65
 -- "A"
@@ -441,8 +445,8 @@ write8 WriteBuffer{..} w = do
     writeIORef offset ptr'
 {-# INLINE write8 #-}
 
--- | Write two bytes and ff one byte.
---   If buffer overrun occurs, 'BufferOverrun' is thrown.
+-- | Write two bytes and ff two bytes.
+--   If buffer overrun occurs, t'BufferOverrun' is thrown.
 --
 -- >>> withWriteBuffer 2 $ \wbuf -> write16 wbuf (65 * 256 + 66)
 -- "AB"
@@ -455,8 +459,8 @@ write16 WriteBuffer{..} w = do
     writeIORef offset ptr'
 {-# INLINE write16 #-}
 
--- | Write three bytes and ff one byte.
---   If buffer overrun occurs, 'BufferOverrun' is thrown.
+-- | Write three bytes and ff three bytes.
+--   If buffer overrun occurs, t'BufferOverrun' is thrown.
 --
 -- >>> withWriteBuffer 3 $ \wbuf -> write24 wbuf (65 * 256^(2 :: Int) + 66 * 256 + 67)
 -- "ABC"
@@ -469,8 +473,8 @@ write24 WriteBuffer{..} w = do
     writeIORef offset ptr'
 {-# INLINE write24 #-}
 
--- | Write four bytes and ff one byte.
---   If buffer overrun occurs, 'BufferOverrun' is thrown.
+-- | Write four bytes and ff four bytes.
+--   If buffer overrun occurs, t'BufferOverrun' is thrown.
 --
 -- >>> withWriteBuffer 4 $ \wbuf -> write32 wbuf (65 * 256^(3 :: Int) + 66 * 256^(2 :: Int) + 67 * 256 + 68)
 -- "ABCD"
@@ -483,8 +487,8 @@ write32 WriteBuffer{..} w = do
     writeIORef offset ptr'
 {-# INLINE write32 #-}
 
--- | Write four bytes and ff one byte.
---   If buffer overrun occurs, 'BufferOverrun' is thrown.
+-- | Write eight bytes and ff eight bytes.
+--   If buffer overrun occurs, t'BufferOverrun' is thrown.
 write64 :: WriteBuffer -> Word64 -> IO ()
 write64 WriteBuffer{..} w = do
     ptr <- readIORef offset
@@ -531,7 +535,7 @@ shiftLastN WriteBuffer{..} i len = do
 {-# INLINE shiftLastN #-}
 
 -- | Copy the content of 'ByteString' and ff its length.
---   If buffer overrun occurs, 'BufferOverrun' is thrown.
+--   If buffer overrun occurs, t'BufferOverrun' is thrown.
 --
 -- >>> withWriteBuffer 3 $ \wbuf -> copyByteString wbuf "ABC"
 -- "ABC"
@@ -546,7 +550,7 @@ copyByteString WriteBuffer{..} (PS fptr off len) = withForeignPtr fptr $ \ptr ->
 {-# INLINE copyByteString #-}
 
 -- | Copy the content of 'ShortByteString' and ff its length.
---   If buffer overrun occurs, 'BufferOverrun' is thrown.
+--   If buffer overrun occurs, t'BufferOverrun' is thrown.
 --
 -- >>> withWriteBuffer 5 $ \wbuf -> copyShortByteString wbuf "ABCEF"
 -- "ABCEF"
@@ -609,7 +613,8 @@ class Readable a where
     -- | Reading one byte as 'Int' and ff one byte. If buffer overrun occurs, -1 is returned.
     readInt8 :: a -> IO Int
 
-    -- | Fast forward the offset pointer. The boundary is not checked.
+    -- | Fast forward the offset pointer.
+    --   If buffer overrun occurs, t'BufferOverrun' is thrown.
     ff :: a -> Offset -> IO ()
 
     -- | Returning the length of the remaining
@@ -713,7 +718,7 @@ newtype ReadBuffer = ReadBuffer WriteBuffer
 newReadBuffer :: Buffer -> BufferSize -> IO ReadBuffer
 newReadBuffer buf siz = ReadBuffer <$> newWriteBuffer buf siz
 
--- | Converting 'ByteString' to 'ReadBuffer' and run the action
+-- | Converting 'ByteString' to t'ReadBuffer' and run the action
 --   with it.
 withReadBuffer :: ByteString -> (ReadBuffer -> IO a) -> IO a
 withReadBuffer (PS fp off siz) action = withForeignPtr fp $ \ptr -> do
@@ -726,7 +731,7 @@ withReadBuffer (PS fp off siz) action = withForeignPtr fp $ \ptr -> do
 --   Its length is specified by the 2nd argument.
 --   If the length is positive, the area after the current pointer is extracted and FF the length finally.
 --   If the length is negative, the area before the current pointer is extracted and does not FF.
---   If buffer overrun occurs, 'BufferOverrun' is thrown.
+--   If buffer overrun occurs, t'BufferOverrun' is thrown.
 --
 -- >>> withReadBuffer "abcdefg" $ \rbuf -> ff rbuf 1 >> extractByteString rbuf 2
 -- "bc"
@@ -758,7 +763,7 @@ extractByteString rbuf len
 --   Its length is specified by the 2nd argument.
 --   If the length is positive, the area after the current pointer is extracted and FF the length finally.
 --   If the length is negative, the area before the current pointer is extracted and does not FF.
---   If buffer overrun occurs, 'BufferOverrun' is thrown.
+--   If buffer overrun occurs, t'BufferOverrun' is thrown.
 --
 -- >>> withReadBuffer "abcdefg" $ \rbuf -> ff rbuf 2 >> extractShortByteString rbuf 3
 -- "cde"
@@ -815,7 +820,7 @@ read32 rbuf = do
     return w32
 {-# INLINE read32 #-}
 
--- | Reading four bytes as 'Word64' and ff four bytes.
+-- | Reading eight bytes as 'Word64' and ff eight bytes.
 read64 :: Readable a => a -> IO Word64
 read64 rbuf = do
     checkR rbuf 8
