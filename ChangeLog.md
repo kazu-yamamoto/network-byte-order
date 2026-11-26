@@ -1,9 +1,11 @@
 # ChangeLog for network-byte-order
 
-## Unreleased
+## 0.1.10
 
 * Check bounds in shiftLastN
   [#5](https://github.com/kazu-yamamoto/network-byte-order/pull/5)
+* Add unsafeBufferIO and deprecate bufferIO
+  [#6](https://github.com/kazu-yamamoto/network-byte-order/pull/6)
 
 ## 0.1.9
 
