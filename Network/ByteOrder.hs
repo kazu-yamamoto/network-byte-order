@@ -38,6 +38,7 @@ module Network.ByteOrder (
     -- * Utilities
     unsafeWithByteString,
     copy,
+    unsafeBufferIO,
     bufferIO,
 
     -- * Class to read a buffer
@@ -401,14 +402,25 @@ copy ptr (PS fp o l) = withForeignPtr fp $ \p -> do
 
 -- | Converting the part of buffer to 'ByteString' and executing the
 --   action with it.
+--   The 'ByteString' shares the buffer, not copies it.
+--   So, it is valid only in the action and must not be returned,
+--   stored or evaluated lazily after the action.
+--   Use 'B.copy' to keep its contents.
 --
 -- >>> let buf = "abcdef" :: ByteString
--- >>> unsafeWithByteString buf $ \ptr _-> bufferIO ptr 2 return
+-- >>> unsafeWithByteString buf $ \ptr _-> unsafeBufferIO ptr 2 (return . B.copy)
 -- "ab"
-bufferIO :: Buffer -> Int -> (ByteString -> IO a) -> IO a
-bufferIO ptr siz io = do
+--
+-- @since 0.1.10
+unsafeBufferIO :: Buffer -> Int -> (ByteString -> IO a) -> IO a
+unsafeBufferIO ptr siz io = do
     fptr <- newForeignPtr_ ptr
     io $ PS fptr 0 siz
+
+-- | The same as 'unsafeBufferIO'.
+bufferIO :: Buffer -> Int -> (ByteString -> IO a) -> IO a
+bufferIO = unsafeBufferIO
+{-# DEPRECATED bufferIO "Use unsafeBufferIO instead" #-}
 
 ----------------------------------------------------------------
 
@@ -421,6 +433,8 @@ data WriteBuffer = WriteBuffer
     }
 
 -- | Creating a write buffer with the given buffer.
+--   The size must not be negative.
+--   The buffer must be valid while the write buffer is used.
 newWriteBuffer :: Buffer -> BufferSize -> IO WriteBuffer
 newWriteBuffer buf siz =
     WriteBuffer buf (buf `plusPtr` siz) <$> newIORef buf <*> newIORef buf
@@ -715,11 +729,15 @@ instance Readable ReadBuffer where
 newtype ReadBuffer = ReadBuffer WriteBuffer
 
 -- | Creating a read buffer with the given buffer.
+--   The size must not be negative.
+--   The buffer must be valid while the read buffer is used.
 newReadBuffer :: Buffer -> BufferSize -> IO ReadBuffer
 newReadBuffer buf siz = ReadBuffer <$> newWriteBuffer buf siz
 
 -- | Converting 'ByteString' to t'ReadBuffer' and run the action
 --   with it.
+--   The t'ReadBuffer' is valid only in the action.
+--   Neither it nor an action using it must be returned.
 withReadBuffer :: ByteString -> (ReadBuffer -> IO a) -> IO a
 withReadBuffer (PS fp off siz) action = withForeignPtr fp $ \ptr -> do
     let buf = ptr `plusPtr` off
