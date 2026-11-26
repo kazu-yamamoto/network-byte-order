@@ -1,6 +1,6 @@
 # ChangeLog for network-byte-order
 
-## Unreleased
+## 0.1.10
 
 * Check bounds in shiftLastN
   [#5](https://github.com/kazu-yamamoto/network-byte-order/pull/5)
